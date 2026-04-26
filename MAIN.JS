@@ -1,3 +1,5 @@
+// main.js — full swap
+
 // === BASIC THREE.JS WORLD ===
 
 // Scene
