@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Inventory</title>
+    <title>Game</title>
 
     <!-- THREE.js -->
     <script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
@@ -13,12 +13,14 @@
 
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body style="margin:0; overflow:hidden;">
 
-    <!-- 3D game -->
-    <div id="game-container"></div>
+    <!-- GAME CANVAS HOLDER -->
+    <div id="game-container" 
+         style="width:100vw; height:100vh; outline:none;">
+    </div>
 
-    <!-- Hotbar -->
+    <!-- HOTBAR -->
     <div id="hotbar">
         <div class="slot" id="slot-0"></div>
         <div class="slot" id="slot-1"></div>
@@ -31,7 +33,7 @@
         <div class="slot" id="slot-8"></div>
     </div>
 
-    <!-- Inventory -->
+    <!-- INVENTORY -->
     <div id="inventory">
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
@@ -41,4 +43,12 @@
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
 
-        <div class="inv-slot"></div><div class="inv-slot">
+        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
+        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
+        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
+    </div>
+
+    <script src="main.js"></script>
+    <script src="inventory.js"></script>
+</body>
+</html>
