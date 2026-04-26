@@ -27,11 +27,9 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// === POINTER LOCK CONTROLS (MOUSE LOOK) ===
-// IMPORTANT: attach to renderer.domElement (the canvas)
+// === POINTER LOCK CONTROLS ===
 const controls = new THREE.PointerLockControls(camera, renderer.domElement);
 
-// Click canvas to lock mouse
 renderer.domElement.addEventListener("click", () => {
     controls.lock();
 });
@@ -45,8 +43,8 @@ let moveRight = false;
 let velocity = new THREE.Vector3();
 let direction = new THREE.Vector3();
 
-const speed = 5.0;      // walking speed
-const gravity = 20.0;   // gravity force
+const speed = 5.0;
+const gravity = 20.0;
 let canJump = true;
 
 // Keyboard input
@@ -58,7 +56,7 @@ document.addEventListener("keydown", (e) => {
         case "KeyD": moveRight = true; break;
         case "Space":
             if (canJump) {
-                velocity.y = 8; // jump strength
+                velocity.y = 8;
                 canJump = false;
             }
             break;
@@ -75,16 +73,40 @@ document.addEventListener("keyup", (e) => {
 });
 
 // === GROUND ===
-const geometry = new THREE.BoxGeometry(200, 1, 200);
-const material = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-const ground = new THREE.Mesh(geometry, material);
+const groundGeo = new THREE.BoxGeometry(200, 1, 200);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.position.y = -1;
 scene.add(ground);
 
-// Light
+// === LIGHT ===
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 10, 7);
 scene.add(light);
+
+// === TREE GENERATOR ===
+function createTree(x, z) {
+    // Trunk
+    const trunkGeo = new THREE.BoxGeometry(0.5, 2, 0.5);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(x, 0, z);
+    scene.add(trunk);
+
+    // Leaves
+    const leavesGeo = new THREE.BoxGeometry(2, 2, 2);
+    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x006400 });
+    const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+    leaves.position.set(x, 2, z);
+    scene.add(leaves);
+}
+
+// === SPAWN RANDOM TREES ===
+for (let i = 0; i < 40; i++) {
+    const x = (Math.random() - 0.5) * 150;
+    const z = (Math.random() - 0.5) * 150;
+    createTree(x, z);
+}
 
 // === ANIMATION LOOP ===
 let prevTime = performance.now();
@@ -96,33 +118,26 @@ function animate() {
     const delta = (time - prevTime) / 1000;
 
     if (controls.isLocked) {
-        // Apply gravity
         velocity.y -= gravity * delta;
 
-        // Movement direction
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        // Apply movement
         if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
         if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
 
-        // Move the camera
         controls.moveRight(-velocity.x * delta);
         controls.moveForward(-velocity.z * delta);
 
-        // Apply vertical movement
         camera.position.y += velocity.y * delta;
 
-        // Ground collision
         if (camera.position.y < 1.7) {
             velocity.y = 0;
             camera.position.y = 1.7;
             canJump = true;
         }
 
-        // Slow down movement (friction)
         velocity.x *= 0.8;
         velocity.z *= 0.8;
     }
