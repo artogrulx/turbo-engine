@@ -28,10 +28,11 @@ window.addEventListener("resize", () => {
 });
 
 // === POINTER LOCK CONTROLS (MOUSE LOOK) ===
-const controls = new THREE.PointerLockControls(camera, document.body);
+// IMPORTANT: attach to renderer.domElement (the canvas)
+const controls = new THREE.PointerLockControls(camera, renderer.domElement);
 
-// Click to lock mouse
-document.body.addEventListener("click", () => {
+// Click canvas to lock mouse
+renderer.domElement.addEventListener("click", () => {
     controls.lock();
 });
 
