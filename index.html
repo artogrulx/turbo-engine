@@ -3,20 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Engine</title>
+    <title>Minecraft Inventory</title>
 
-    <!-- THREE.js from CDN (r150) -->
+    <!-- THREE.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
 
-    <!-- Your CSS -->
+    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Your game canvas or UI will attach here -->
+    <!-- Game container -->
     <div id="game-container"></div>
 
-    <!-- Your inventory + game logic -->
+    <!-- HOTBAR (9 slots) -->
+    <div id="hotbar">
+        <div class="slot" id="slot-0"></div>
+        <div class="slot" id="slot-1"></div>
+        <div class="slot" id="slot-2"></div>
+        <div class="slot" id="slot-3"></div>
+        <div class="slot" id="slot-4"></div>
+        <div class="slot" id="slot-5"></div>
+        <div class="slot" id="slot-6"></div>
+        <div class="slot" id="slot-7"></div>
+        <div class="slot" id="slot-8"></div>
+    </div>
+
+    <!-- FULL INVENTORY (27 slots) -->
+    <div id="inventory">
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+        <div class="inv-slot"></div>
+    </div>
+
+    <!-- JS -->
     <script src="inventory.js"></script>
 
 </body>
