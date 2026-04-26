@@ -18,6 +18,10 @@ camera.position.set(0, 1.7, 0);
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+
+// ⭐ REQUIRED FOR POINTER LOCK TO WORK ON GITHUB PAGES
+renderer.domElement.tabIndex = 1;
+
 document.getElementById("game-container").appendChild(renderer.domElement);
 
 // Resize handling
@@ -30,7 +34,9 @@ window.addEventListener("resize", () => {
 // === POINTER LOCK CONTROLS ===
 const controls = new THREE.PointerLockControls(camera, renderer.domElement);
 
+// Click canvas to lock mouse
 renderer.domElement.addEventListener("click", () => {
+    renderer.domElement.focus(); // ⭐ force focus
     controls.lock();
 });
 
