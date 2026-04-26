@@ -1,11 +1,14 @@
+// inventory.js  — drop-in swap
+
 // Toggle inventory with E key
 let inventoryOpen = false;
 
 document.addEventListener("keydown", (e) => {
     if (e.key === "e" || e.key === "E") {
         inventoryOpen = !inventoryOpen;
-        document.getElementById("inventory").style.display =
-            inventoryOpen ? "grid" : "none";
+        const inv = document.getElementById("inventory");
+        if (!inv) return; // safety
+        inv.style.display = inventoryOpen ? "grid" : "none";
     }
 });
 
@@ -19,9 +22,12 @@ document.addEventListener("keydown", (e) => {
 
 function highlightSlot(index) {
     for (let i = 0; i < 9; i++) {
-        document.getElementById(`slot-${i}`).style.borderColor = "#555";
+        const slot = document.getElementById(`slot-${i}`);
+        if (!slot) continue; // safety
+        slot.style.borderColor = "#555";
     }
-    document.getElementById(`slot-${index}`).style.borderColor = "yellow";
+    const active = document.getElementById(`slot-${index}`);
+    if (active) active.style.borderColor = "yellow";
 }
 
 // Default selected slot
