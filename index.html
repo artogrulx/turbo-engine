@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minecraft Inventory</title>
 
-    <!-- THREE.js (working CDN) -->
+    <!-- THREE.js -->
     <script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
+
+    <!-- Pointer Lock Controls -->
+    <script src="https://unpkg.com/three@0.150.0/examples/js/controls/PointerLockControls.js"></script>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -30,7 +33,6 @@
 
     <!-- Inventory -->
     <div id="inventory">
-        <!-- 27 slots -->
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
@@ -39,12 +41,4 @@
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
         <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
 
-        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
-        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
-        <div class="inv-slot"></div><div class="inv-slot"></div><div class="inv-slot"></div>
-    </div>
-
-    <script src="main.js"></script>
-    <script src="inventory.js"></script>
-</body>
-</html>
+        <div class="inv-slot"></div><div class="inv-slot">
