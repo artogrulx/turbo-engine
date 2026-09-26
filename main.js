@@ -1,11 +1,12 @@
 // ============================================================
 // BLOCK WORLD
-// THREE.JS MINECRAFT-STYLE WORLD ENGINE
+// COMPLETE WORLD + PHYSICS REWRITE
+// Three.js r128
 // ============================================================
 
 
 // ============================================================
-// CONFIG
+// CONFIGURATION
 // ============================================================
 
 const CHUNK_SIZE = 16;
@@ -14,17 +15,125 @@ const RENDER_DISTANCE = 3;
 
 const SEA_LEVEL = 0;
 
-const PLAYER_HEIGHT = 1.7;
+const WORLD_BOTTOM = -35;
 
-const PLAYER_RADIUS = 0.30;
 
-const WALK_SPEED = 5.5;
+// Player dimensions.
+//
+// Camera represents the player's eye position.
+//
+// Feet:
+// camera.y - PLAYER_EYE_HEIGHT
+//
+// Head:
+// feet + PLAYER_TOTAL_HEIGHT
+
+const PLAYER_WIDTH = 0.60;
+
+const PLAYER_RADIUS =
+    PLAYER_WIDTH / 2;
+
+const PLAYER_TOTAL_HEIGHT = 1.80;
+
+const PLAYER_EYE_HEIGHT = 1.62;
+
+
+// Movement
+
+const WALK_SPEED = 5.3;
 
 const GRAVITY = 24;
 
 const JUMP_FORCE = 8.5;
 
 const REACH_DISTANCE = 6;
+
+
+// Small collision tolerance.
+
+const COLLISION_EPSILON = 0.001;
+
+
+// ============================================================
+// BLOCK DEFINITIONS
+// ============================================================
+
+const BLOCKS = {
+
+    grass: {
+
+        solid: true,
+
+        transparent: false,
+
+        breakable: true
+
+    },
+
+    dirt: {
+
+        solid: true,
+
+        transparent: false,
+
+        breakable: true
+
+    },
+
+    stone: {
+
+        solid: true,
+
+        transparent: false,
+
+        breakable: true
+
+    },
+
+    sand: {
+
+        solid: true,
+
+        transparent: false,
+
+        breakable: true
+
+    },
+
+    log: {
+
+        solid: true,
+
+        transparent: false,
+
+        breakable: true
+
+    },
+
+    leaves: {
+
+        solid: true,
+
+        transparent: true,
+
+        breakable: true
+
+    },
+
+    water: {
+
+        // IMPORTANT:
+        // Water exists, but does NOT block movement.
+
+        solid: false,
+
+        transparent: true,
+
+        breakable: false
+
+    }
+
+};
 
 
 // ============================================================
@@ -37,15 +146,15 @@ const scene =
 
 scene.background =
     new THREE.Color(
-        0x8fc9ff
+        0x87c9ff
     );
 
 
 scene.fog =
     new THREE.Fog(
-        0xaed7ef,
-        55,
-        125
+        0xb7dcf5,
+        65,
+        135
     );
 
 
@@ -116,7 +225,7 @@ renderer.toneMapping =
 
 
 renderer.toneMappingExposure =
-    1.08;
+    1.05;
 
 
 document
@@ -163,7 +272,7 @@ const sky =
         new THREE.MeshBasicMaterial({
 
             color:
-                0x82c5f4,
+                0x87c9ff,
 
             side:
                 THREE.BackSide
@@ -173,21 +282,23 @@ const sky =
     );
 
 
-scene.add(sky);
+scene.add(
+    sky
+);
 
 
 // ============================================================
-// LIGHT
+// LIGHTING
 // ============================================================
 
 const hemisphere =
     new THREE.HemisphereLight(
 
-        0xd8efff,
+        0xd9f0ff,
 
-        0x53672e,
+        0x53652f,
 
-        0.85
+        0.9
 
     );
 
@@ -200,9 +311,9 @@ scene.add(
 const sun =
     new THREE.DirectionalLight(
 
-        0xffedc2,
+        0xffefc8,
 
-        2.15
+        2.1
 
     );
 
@@ -218,26 +329,28 @@ sun.castShadow =
     true;
 
 
-sun.shadow.mapSize.set(
-    2048,
-    2048
-);
+sun.shadow.mapSize.width =
+    2048;
+
+
+sun.shadow.mapSize.height =
+    2048;
 
 
 sun.shadow.camera.left =
-    -45;
+    -50;
 
 
 sun.shadow.camera.right =
-    45;
+    50;
 
 
 sun.shadow.camera.top =
-    45;
+    50;
 
 
 sun.shadow.camera.bottom =
-    -45;
+    -50;
 
 
 sun.shadow.camera.near =
@@ -245,7 +358,11 @@ sun.shadow.camera.near =
 
 
 sun.shadow.camera.far =
-    160;
+    180;
+
+
+sun.shadow.bias =
+    -0.0007;
 
 
 scene.add(
@@ -254,7 +371,7 @@ scene.add(
 
 
 // ============================================================
-// SUN BLOCK
+// MINECRAFT-STYLE SUN
 // ============================================================
 
 const sunBlock =
@@ -269,7 +386,7 @@ const sunBlock =
         new THREE.MeshBasicMaterial({
 
             color:
-                0xfff0a8
+                0xfff1aa
 
         })
 
@@ -286,6 +403,18 @@ sunBlock.position.set(
 scene.add(
     sunBlock
 );
+
+
+// ============================================================
+// SHARED BLOCK GEOMETRY
+// ============================================================
+
+const cubeGeometry =
+    new THREE.BoxGeometry(
+        1,
+        1,
+        1
+    );
 
 
 // ============================================================
@@ -370,38 +499,48 @@ const blockMaterials = {
                 true,
 
             opacity:
-                0.58,
+                0.52,
 
             roughness:
-                0.2,
+                0.25,
+
+            metalness:
+                0,
 
             depthWrite:
-                false
+                false,
+
+            side:
+                THREE.DoubleSide
 
         })
 
 };
 
 
-const cubeGeometry =
-    new THREE.BoxGeometry(
-        1,
-        1,
-        1
-    );
-
-
 // ============================================================
-// WORLD DATA
+// WORLD STORAGE
 // ============================================================
 
 const chunks =
     new Map();
 
 
+// modifications:
+//
+// missing entry = use generated world
+//
+// null = player destroyed this block
+//
+// "stone", "dirt", etc = player placed/replaced block
+
 const modifications =
     new Map();
 
+
+// ============================================================
+// WORLD KEYS
+// ============================================================
 
 function blockKey(
     x,
@@ -435,7 +574,7 @@ function chunkKey(
 
 
 // ============================================================
-// RANDOM / NOISE
+// DETERMINISTIC RANDOM
 // ============================================================
 
 function hash2D(
@@ -476,6 +615,10 @@ function hash2D(
 
 }
 
+
+// ============================================================
+// VALUE NOISE
+// ============================================================
 
 function smooth(t) {
 
@@ -573,29 +716,39 @@ function noise(
         );
 
 
-    return lerp(
-
+    const a =
         lerp(
             n00,
             n10,
             sx
-        ),
+        );
 
+
+    const b =
         lerp(
             n01,
             n11,
             sx
-        ),
+        );
 
+
+    return lerp(
+        a,
+        b,
         sz
-
     );
 
 }
 
 
 // ============================================================
-// TERRAIN
+// TERRAIN HEIGHT
+//
+// IMPORTANT:
+//
+// This is ONLY used to GENERATE terrain.
+//
+// Player physics does NOT use this as an invisible floor.
 // ============================================================
 
 function terrainHeight(
@@ -629,6 +782,17 @@ function terrainHeight(
 
 
     h +=
+        (
+            noise(
+                x * 0.18,
+                z * 0.18
+            ) -
+            0.5
+        ) *
+        2;
+
+
+    h +=
         Math.sin(
             x *
             0.045
@@ -650,33 +814,256 @@ function terrainHeight(
 
 
 // ============================================================
-// GENERATED BLOCK
+// TREE INFORMATION
 // ============================================================
 
-function getGeneratedBlock(
+function treeExistsAt(
+    x,
+    z
+) {
+
+    const ground =
+        terrainHeight(
+            x,
+            z
+        );
+
+
+    if(
+        ground <=
+        SEA_LEVEL + 1
+    ) {
+
+        return false;
+
+    }
+
+
+    // Keep spawn region cleaner.
+
+    if(
+        Math.abs(x) <
+        7 &&
+        Math.abs(z) <
+        7
+    ) {
+
+        return false;
+
+    }
+
+
+    const chance =
+        hash2D(
+            x + 918,
+            z - 527
+        );
+
+
+    return (
+        chance >
+        0.982
+    );
+
+}
+
+
+function treeHeight(
+    x,
+    z
+) {
+
+    return (
+        hash2D(
+            x * 2,
+            z * 3
+        ) >
+        0.5
+    )
+        ? 5
+        : 4;
+
+}
+
+
+// ============================================================
+// TREE BLOCK LOOKUP
+//
+// This allows collision to know that a tree exists even
+// though trees are generated visually in chunks.
+// ============================================================
+
+function getGeneratedTreeBlock(
     x,
     y,
     z
 ) {
 
-    const modified =
-        modifications.get(
-            blockKey(
-                x,
-                y,
-                z
-            )
+    // A leaf block may belong to a tree whose trunk is
+    // a few blocks away, so search nearby trunk positions.
+
+    for(
+        let tx =
+            x - 2;
+
+        tx <=
+            x + 2;
+
+        tx++
+    ) {
+
+        for(
+            let tz =
+                z - 2;
+
+            tz <=
+                z + 2;
+
+            tz++
+        ) {
+
+            if(
+                !treeExistsAt(
+                    tx,
+                    tz
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            const ground =
+                terrainHeight(
+                    tx,
+                    tz
+                );
+
+
+            const height =
+                treeHeight(
+                    tx,
+                    tz
+                );
+
+
+            // -------------------------
+            // TRUNK
+            // -------------------------
+
+            if(
+                x === tx &&
+                z === tz &&
+                y >=
+                    ground + 1 &&
+                y <=
+                    ground + height
+            ) {
+
+                return "log";
+
+            }
+
+
+            const dx =
+                x - tx;
+
+
+            const dz =
+                z - tz;
+
+
+            // -------------------------
+            // LOWER LEAVES
+            // -------------------------
+
+            if(
+                y ===
+                    ground +
+                    height ||
+
+                y ===
+                    ground +
+                    height +
+                    1
+            ) {
+
+                if(
+                    Math.abs(dx) <= 2 &&
+                    Math.abs(dz) <= 2
+                ) {
+
+                    if(
+                        !(
+                            Math.abs(dx) === 2 &&
+                            Math.abs(dz) === 2
+                        )
+                    ) {
+
+                        return "leaves";
+
+                    }
+
+                }
+
+            }
+
+
+            // -------------------------
+            // TOP LEAVES
+            // -------------------------
+
+            if(
+                y ===
+                ground +
+                height +
+                2
+            ) {
+
+                if(
+                    Math.abs(dx) <= 1 &&
+                    Math.abs(dz) <= 1
+                ) {
+
+                    return "leaves";
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return null;
+
+}
+
+
+// ============================================================
+// PROCEDURAL BLOCK LOOKUP
+// ============================================================
+
+function getNaturalBlock(
+    x,
+    y,
+    z
+) {
+
+    // Trees first.
+
+    const tree =
+        getGeneratedTreeBlock(
+            x,
+            y,
+            z
         );
 
 
-    if(
-        modified !==
-        undefined
-    ) {
-
-        return modified;
-
-    }
+    if(tree)
+        return tree;
 
 
     const h =
@@ -686,13 +1073,19 @@ function getGeneratedBlock(
         );
 
 
+    // -------------------------
+    // ABOVE TERRAIN
+    // -------------------------
+
     if(
         y >
         h
     ) {
 
+        // Water occupies spaces up to sea level.
+
         if(
-            y ===
+            y <=
             SEA_LEVEL &&
             h <
             SEA_LEVEL
@@ -708,31 +1101,33 @@ function getGeneratedBlock(
     }
 
 
+    // -------------------------
+    // SURFACE
+    // -------------------------
+
     if(
-        h <=
-        SEA_LEVEL
+        y ===
+        h
     ) {
 
         if(
-            y ===
-            h
+            h <=
+            SEA_LEVEL
         ) {
 
             return "sand";
 
         }
 
-    }
-
-    else if(
-        y ===
-        h
-    ) {
 
         return "grass";
 
     }
 
+
+    // -------------------------
+    // DIRT
+    // -------------------------
 
     if(
         y >=
@@ -744,13 +1139,139 @@ function getGeneratedBlock(
     }
 
 
+    // -------------------------
+    // STONE
+    // -------------------------
+
     return "stone";
 
 }
 
 
 // ============================================================
-// CHUNK
+// ACTUAL BLOCK LOOKUP
+//
+// THIS is now the authority for physics.
+//
+// If you destroy a block, this returns null.
+//
+// Therefore the player can fall into the hole.
+// ============================================================
+
+function getBlock(
+    x,
+    y,
+    z
+) {
+
+    x =
+        Math.floor(
+            x
+        );
+
+
+    y =
+        Math.floor(
+            y
+        );
+
+
+    z =
+        Math.floor(
+            z
+        );
+
+
+    const key =
+        blockKey(
+            x,
+            y,
+            z
+        );
+
+
+    if(
+        modifications.has(key)
+    ) {
+
+        return modifications.get(
+            key
+        );
+
+    }
+
+
+    return getNaturalBlock(
+        x,
+        y,
+        z
+    );
+
+}
+
+
+// ============================================================
+// SOLID CHECK
+// ============================================================
+
+function isSolidBlock(
+    x,
+    y,
+    z
+) {
+
+    const type =
+        getBlock(
+            x,
+            y,
+            z
+        );
+
+
+    if(!type)
+        return false;
+
+
+    const definition =
+        BLOCKS[type];
+
+
+    if(!definition)
+        return false;
+
+
+    return (
+        definition.solid ===
+        true
+    );
+
+}
+
+
+// ============================================================
+// WATER CHECK
+// ============================================================
+
+function isWaterBlock(
+    x,
+    y,
+    z
+) {
+
+    return (
+        getBlock(
+            x,
+            y,
+            z
+        ) ===
+        "water"
+    );
+
+}
+
+
+// ============================================================
+// CREATE CHUNK
 // ============================================================
 
 function createChunk(
@@ -786,13 +1307,13 @@ function createChunk(
         chunkZ;
 
 
-    scene.add(
+    chunks.set(
+        key,
         group
     );
 
 
-    chunks.set(
-        key,
+    scene.add(
         group
     );
 
@@ -801,6 +1322,31 @@ function createChunk(
         chunkX,
         chunkZ
     );
+
+}
+
+
+// ============================================================
+// CLEAR CHUNK
+// ============================================================
+
+function clearChunk(
+    group
+) {
+
+    while(
+        group.children.length >
+        0
+    ) {
+
+        group.remove(
+            group.children[
+                group.children.length -
+                1
+            ]
+        );
+
+    }
 
 }
 
@@ -829,18 +1375,12 @@ function rebuildChunk(
         return;
 
 
-    while(
-        group.children.length
-    ) {
-
-        group.remove(
-            group.children[0]
-        );
-
-    }
+    clearChunk(
+        group
+    );
 
 
-    const blocks = {
+    const lists = {
 
         grass: [],
 
@@ -870,29 +1410,29 @@ function rebuildChunk(
 
 
     // ========================================================
-    // NATURAL TERRAIN
+    // TERRAIN
     // ========================================================
 
     for(
-        let lx = 0;
-        lx < CHUNK_SIZE;
-        lx++
+        let localX = 0;
+        localX < CHUNK_SIZE;
+        localX++
     ) {
 
         for(
-            let lz = 0;
-            lz < CHUNK_SIZE;
-            lz++
+            let localZ = 0;
+            localZ < CHUNK_SIZE;
+            localZ++
         ) {
 
             const x =
                 startX +
-                lx;
+                localX;
 
 
             const z =
                 startZ +
-                lz;
+                localZ;
 
 
             const h =
@@ -902,12 +1442,18 @@ function rebuildChunk(
                 );
 
 
-            // Only create several visible layers,
-            // rather than filling the world to bedrock.
+            // Render several terrain layers.
+
+            const bottom =
+                Math.max(
+                    h - 4,
+                    WORLD_BOTTOM
+                );
+
 
             for(
                 let y =
-                    h - 3;
+                    bottom;
 
                 y <= h;
 
@@ -915,7 +1461,7 @@ function rebuildChunk(
             ) {
 
                 const type =
-                    getGeneratedBlock(
+                    getBlock(
                         x,
                         y,
                         z
@@ -924,10 +1470,10 @@ function rebuildChunk(
 
                 if(
                     type &&
-                    blocks[type]
+                    lists[type]
                 ) {
 
-                    blocks[type].push({
+                    lists[type].push({
 
                         x,
                         y,
@@ -940,75 +1486,70 @@ function rebuildChunk(
             }
 
 
-            // WATER SURFACE
+            // =================================================
+            // WATER
+            // =================================================
 
             if(
                 h <
                 SEA_LEVEL
             ) {
 
-                const water =
-                    getGeneratedBlock(
-                        x,
-                        SEA_LEVEL,
-                        z
-                    );
+                for(
+                    let y =
+                        h + 1;
 
+                    y <=
+                        SEA_LEVEL;
 
-                if(
-                    water ===
-                    "water"
+                    y++
                 ) {
 
-                    blocks.water.push({
+                    const type =
+                        getBlock(
+                            x,
+                            y,
+                            z
+                        );
 
-                        x,
 
-                        y:
-                            SEA_LEVEL,
+                    if(
+                        type ===
+                        "water"
+                    ) {
 
-                        z
+                        lists.water.push({
 
-                    });
+                            x,
+                            y,
+                            z
+
+                        });
+
+                    }
 
                 }
 
             }
 
 
-            // TREES
+            // =================================================
+            // TREE
+            // =================================================
 
             if(
-                h >
-                SEA_LEVEL +
-                1
+                treeExistsAt(
+                    x,
+                    z
+                )
             ) {
 
-                const chance =
-                    hash2D(
-                        x + 918,
-                        z - 527
-                    );
-
-
-                if(
-                    chance >
-                    0.982
-                ) {
-
-                    addTree(
-
-                        x,
-
-                        h,
-
-                        z,
-
-                        blocks
-
-                    );
-
-                }
+                addTreeVisuals(
+                    x,
+                    h,
+                    z,
+                    lists
+                );
 
             }
 
@@ -1018,18 +1559,18 @@ function rebuildChunk(
 
 
     // ========================================================
-    // MODIFIED / PLACED BLOCKS
+    // PLACED BLOCKS ABOVE NATURAL RENDER RANGE
     // ========================================================
 
     for(
         const [
             key,
-            type
+            value
         ]
         of modifications
     ) {
 
-        if(!type)
+        if(!value)
             continue;
 
 
@@ -1051,24 +1592,24 @@ function rebuildChunk(
             parts[2];
 
 
-        if(
+        const cx =
             Math.floor(
                 x /
                 CHUNK_SIZE
-            ) !==
-            chunkX
-        ) {
-
-            continue;
-
-        }
+            );
 
 
-        if(
+        const cz =
             Math.floor(
                 z /
                 CHUNK_SIZE
-            ) !==
+            );
+
+
+        if(
+            cx !==
+            chunkX ||
+            cz !==
             chunkZ
         ) {
 
@@ -1078,32 +1619,37 @@ function rebuildChunk(
 
 
         if(
-            blocks[type]
+            !lists[value]
         ) {
 
-            // Avoid duplicate terrain position.
+            continue;
 
-            const exists =
-                blocks[type]
-                .some(
-                    p =>
-                        p.x === x &&
-                        p.y === y &&
-                        p.z === z
-                );
+        }
 
 
-            if(!exists) {
+        // Check if already in list.
 
-                blocks[type].push({
+        const alreadyExists =
+            lists[value]
+            .some(
+                p =>
+                    p.x === x &&
+                    p.y === y &&
+                    p.z === z
+            );
 
-                    x,
-                    y,
-                    z
 
-                });
+        if(
+            !alreadyExists
+        ) {
 
-            }
+            lists[value].push({
+
+                x,
+                y,
+                z
+
+            });
 
         }
 
@@ -1117,7 +1663,7 @@ function rebuildChunk(
     for(
         const type
         of Object.keys(
-            blocks
+            lists
         )
     ) {
 
@@ -1127,7 +1673,7 @@ function rebuildChunk(
 
             type,
 
-            blocks[type]
+            lists[type]
 
         );
 
@@ -1137,116 +1683,50 @@ function rebuildChunk(
 
 
 // ============================================================
-// TREE
+// TREE VISUALS
 // ============================================================
 
-function addTree(
+function addTreeVisuals(
     x,
     groundY,
     z,
-    blocks
+    lists
 ) {
 
-    // Keep starting area open.
-
-    if(
-        Math.abs(x) <
-        7 &&
-        Math.abs(z) <
-        7
-    ) {
-
-        return;
-
-    }
+    const height =
+        treeHeight(
+            x,
+            z
+        );
 
 
-    const trunkHeight =
-        hash2D(
-            x * 2,
-            z * 3
-        ) >
-        0.5
-            ? 5
-            : 4;
-
+    // Trunk
 
     for(
         let i = 1;
-        i <= trunkHeight;
+        i <= height;
         i++
     ) {
 
-        blocks.log.push({
-
-            x,
-
-            y:
-                groundY +
-                i,
-
-            z
-
-        });
-
-    }
+        const y =
+            groundY +
+            i;
 
 
-    for(
-        let ox = -2;
-        ox <= 2;
-        ox++
-    ) {
-
-        for(
-            let oz = -2;
-            oz <= 2;
-            oz++
+        if(
+            getBlock(
+                x,
+                y,
+                z
+            ) ===
+            "log"
         ) {
 
-            if(
-                Math.abs(ox) ===
-                2 &&
-                Math.abs(oz) ===
-                2
-            ) {
+            lists.log.push({
 
-                continue;
-
-            }
-
-
-            blocks.leaves.push({
-
-                x:
-                    x +
-                    ox,
-
-                y:
-                    groundY +
-                    trunkHeight,
-
-                z:
-                    z +
-                    oz
-
-            });
-
-
-            blocks.leaves.push({
-
-                x:
-                    x +
-                    ox,
-
-                y:
-                    groundY +
-                    trunkHeight +
-                    1,
-
-                z:
-                    z +
-                    oz
+                x,
+                y,
+                z
 
             });
 
@@ -1255,34 +1735,133 @@ function addTree(
     }
 
 
+    // Lower leaf layers.
+
     for(
-        let ox = -1;
-        ox <= 1;
-        ox++
+        let layer = 0;
+        layer <= 1;
+        layer++
+    ) {
+
+        const y =
+            groundY +
+            height +
+            layer;
+
+
+        for(
+            let dx = -2;
+            dx <= 2;
+            dx++
+        ) {
+
+            for(
+                let dz = -2;
+                dz <= 2;
+                dz++
+            ) {
+
+                if(
+                    Math.abs(dx) ===
+                        2 &&
+                    Math.abs(dz) ===
+                        2
+                ) {
+
+                    continue;
+
+                }
+
+
+                const bx =
+                    x +
+                    dx;
+
+
+                const bz =
+                    z +
+                    dz;
+
+
+                if(
+                    getBlock(
+                        bx,
+                        y,
+                        bz
+                    ) ===
+                    "leaves"
+                ) {
+
+                    lists.leaves.push({
+
+                        x: bx,
+
+                        y,
+
+                        z: bz
+
+                    });
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    // Upper leaves.
+
+    const topY =
+        groundY +
+        height +
+        2;
+
+
+    for(
+        let dx = -1;
+        dx <= 1;
+        dx++
     ) {
 
         for(
-            let oz = -1;
-            oz <= 1;
-            oz++
+            let dz = -1;
+            dz <= 1;
+            dz++
         ) {
 
-            blocks.leaves.push({
+            const bx =
+                x +
+                dx;
 
-                x:
-                    x +
-                    ox,
 
-                y:
-                    groundY +
-                    trunkHeight +
-                    2,
+            const bz =
+                z +
+                dz;
 
-                z:
-                    z +
-                    oz
 
-            });
+            if(
+                getBlock(
+                    bx,
+                    topY,
+                    bz
+                ) ===
+                "leaves"
+            ) {
+
+                lists.leaves.push({
+
+                    x: bx,
+
+                    y:
+                        topY,
+
+                    z: bz
+
+                });
+
+            }
 
         }
 
@@ -1292,7 +1871,7 @@ function addTree(
 
 
 // ============================================================
-// INSTANCED BLOCKS
+// INSTANCED MESH CREATION
 // ============================================================
 
 const dummy =
@@ -1352,22 +1931,30 @@ function createInstancedBlocks(
         );
 
 
-        // Water is slightly shorter.
+        dummy.rotation.set(
+            0,
+            0,
+            0
+        );
+
 
         if(
             type ===
             "water"
         ) {
 
+            // Minecraft-like water block:
+            // slightly below full block height.
+
             dummy.scale.set(
                 1,
-                0.82,
+                0.88,
                 1
             );
 
 
             dummy.position.y -=
-                0.09;
+                0.06;
 
         }
 
@@ -1380,13 +1967,6 @@ function createInstancedBlocks(
             );
 
         }
-
-
-        dummy.rotation.set(
-            0,
-            0,
-            0
-        );
 
 
         dummy.updateMatrix();
@@ -1412,7 +1992,10 @@ function createInstancedBlocks(
 
 
     mesh.receiveShadow =
-        true;
+        (
+            type !==
+            "water"
+        );
 
 
     if(
@@ -1434,7 +2017,7 @@ function createInstancedBlocks(
 
 
 // ============================================================
-// CHUNK LOADING
+// CHUNK MANAGEMENT
 // ============================================================
 
 let playerChunkX =
@@ -1445,30 +2028,40 @@ let playerChunkZ =
     null;
 
 
+function worldToChunk(
+    coordinate
+) {
+
+    return Math.floor(
+        coordinate /
+        CHUNK_SIZE
+    );
+
+}
+
+
 function updateChunks(
     force = false
 ) {
 
     const cx =
-        Math.floor(
-            camera.position.x /
-            CHUNK_SIZE
+        worldToChunk(
+            camera.position.x
         );
 
 
     const cz =
-        Math.floor(
-            camera.position.z /
-            CHUNK_SIZE
+        worldToChunk(
+            camera.position.z
         );
 
 
     if(
         !force &&
         cx ===
-        playerChunkX &&
+            playerChunkX &&
         cz ===
-        playerChunkZ
+            playerChunkZ
     ) {
 
         return;
@@ -1483,6 +2076,8 @@ function updateChunks(
     playerChunkZ =
         cz;
 
+
+    // Create nearby chunks.
 
     for(
         let x =
@@ -1518,13 +2113,22 @@ function updateChunks(
     }
 
 
+    // Remove distant chunks.
+
+    const keys =
+        Array.from(
+            chunks.keys()
+        );
+
+
     for(
-        const [
-            key,
-            group
-        ]
-        of chunks
+        const key
+        of keys
     ) {
+
+        const group =
+            chunks.get(key);
+
 
         const dx =
             Math.abs(
@@ -1542,12 +2146,12 @@ function updateChunks(
 
         if(
             dx >
-            RENDER_DISTANCE +
-            1 ||
+                RENDER_DISTANCE +
+                1 ||
 
             dz >
-            RENDER_DISTANCE +
-            1
+                RENDER_DISTANCE +
+                1
         ) {
 
             scene.remove(
@@ -1567,7 +2171,7 @@ function updateChunks(
 
 
 // ============================================================
-// REBUILD BLOCK'S CHUNK
+// REBUILD CHUNK AROUND MODIFICATION
 // ============================================================
 
 function rebuildBlockChunk(
@@ -1576,16 +2180,14 @@ function rebuildBlockChunk(
 ) {
 
     const cx =
-        Math.floor(
-            x /
-            CHUNK_SIZE
+        worldToChunk(
+            x
         );
 
 
     const cz =
-        Math.floor(
-            z /
-            CHUNK_SIZE
+        worldToChunk(
+            z
         );
 
 
@@ -1594,8 +2196,6 @@ function rebuildBlockChunk(
         cz
     );
 
-
-    // Rebuild neighboring chunk at boundaries.
 
     const localX =
         (
@@ -1619,44 +2219,62 @@ function rebuildBlockChunk(
         CHUNK_SIZE;
 
 
-    if(localX === 0)
+    if(
+        localX ===
+        0
+    ) {
+
         rebuildChunk(
             cx - 1,
             cz
         );
 
+    }
+
 
     if(
         localX ===
         CHUNK_SIZE - 1
-    )
+    ) {
+
         rebuildChunk(
             cx + 1,
             cz
         );
 
+    }
 
-    if(localZ === 0)
+
+    if(
+        localZ ===
+        0
+    ) {
+
         rebuildChunk(
             cx,
             cz - 1
         );
 
+    }
+
 
     if(
         localZ ===
         CHUNK_SIZE - 1
-    )
+    ) {
+
         rebuildChunk(
             cx,
             cz + 1
         );
 
+    }
+
 }
 
 
 // ============================================================
-// PLAYER
+// PLAYER PHYSICS STATE
 // ============================================================
 
 let moveForward =
@@ -1679,43 +2297,765 @@ let canJump =
     false;
 
 
+let playerInWater =
+    false;
+
+
 const velocity =
     new THREE.Vector3();
 
 
-const direction =
+// ============================================================
+// PLAYER AABB
+// ============================================================
+
+function getPlayerAABB(
+    x = camera.position.x,
+    eyeY = camera.position.y,
+    z = camera.position.z
+) {
+
+    const feetY =
+        eyeY -
+        PLAYER_EYE_HEIGHT;
+
+
+    return {
+
+        minX:
+            x -
+            PLAYER_RADIUS,
+
+        maxX:
+            x +
+            PLAYER_RADIUS,
+
+        minY:
+            feetY,
+
+        maxY:
+            feetY +
+            PLAYER_TOTAL_HEIGHT,
+
+        minZ:
+            z -
+            PLAYER_RADIUS,
+
+        maxZ:
+            z +
+            PLAYER_RADIUS
+
+    };
+
+}
+
+
+// ============================================================
+// AABB VS BLOCK
+// ============================================================
+
+function aabbIntersectsBlock(
+    box,
+    x,
+    y,
+    z
+) {
+
+    const minX =
+        x -
+        0.5;
+
+
+    const maxX =
+        x +
+        0.5;
+
+
+    const minY =
+        y -
+        0.5;
+
+
+    const maxY =
+        y +
+        0.5;
+
+
+    const minZ =
+        z -
+        0.5;
+
+
+    const maxZ =
+        z +
+        0.5;
+
+
+    return (
+
+        box.maxX >
+            minX +
+            COLLISION_EPSILON &&
+
+        box.minX <
+            maxX -
+            COLLISION_EPSILON &&
+
+        box.maxY >
+            minY +
+            COLLISION_EPSILON &&
+
+        box.minY <
+            maxY -
+            COLLISION_EPSILON &&
+
+        box.maxZ >
+            minZ +
+            COLLISION_EPSILON &&
+
+        box.minZ <
+            maxZ -
+            COLLISION_EPSILON
+
+    );
+
+}
+
+
+// ============================================================
+// CHECK PLAYER COLLISION
+// ============================================================
+
+function playerCollidesAt(
+    x,
+    eyeY,
+    z
+) {
+
+    const box =
+        getPlayerAABB(
+            x,
+            eyeY,
+            z
+        );
+
+
+    const minBlockX =
+        Math.floor(
+            box.minX -
+            0.5
+        );
+
+
+    const maxBlockX =
+        Math.floor(
+            box.maxX +
+            0.5
+        );
+
+
+    const minBlockY =
+        Math.floor(
+            box.minY -
+            0.5
+        );
+
+
+    const maxBlockY =
+        Math.floor(
+            box.maxY +
+            0.5
+        );
+
+
+    const minBlockZ =
+        Math.floor(
+            box.minZ -
+            0.5
+        );
+
+
+    const maxBlockZ =
+        Math.floor(
+            box.maxZ +
+            0.5
+        );
+
+
+    for(
+        let xBlock =
+            minBlockX;
+
+        xBlock <=
+            maxBlockX;
+
+        xBlock++
+    ) {
+
+        for(
+            let yBlock =
+                minBlockY;
+
+            yBlock <=
+                maxBlockY;
+
+            yBlock++
+        ) {
+
+            for(
+                let zBlock =
+                    minBlockZ;
+
+                zBlock <=
+                    maxBlockZ;
+
+                zBlock++
+            ) {
+
+                if(
+                    !isSolidBlock(
+                        xBlock,
+                        yBlock,
+                        zBlock
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                if(
+                    aabbIntersectsBlock(
+
+                        box,
+
+                        xBlock,
+
+                        yBlock,
+
+                        zBlock
+
+                    )
+                ) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return false;
+
+}
+
+
+// ============================================================
+// WATER DETECTION
+// ============================================================
+
+function updateWaterState() {
+
+    const feetY =
+        camera.position.y -
+        PLAYER_EYE_HEIGHT;
+
+
+    const centerY =
+        feetY +
+        PLAYER_TOTAL_HEIGHT *
+        0.45;
+
+
+    playerInWater =
+        isWaterBlock(
+
+            Math.floor(
+                camera.position.x +
+                0.5
+            ),
+
+            Math.floor(
+                centerY +
+                0.5
+            ),
+
+            Math.floor(
+                camera.position.z +
+                0.5
+            )
+
+        );
+
+}
+
+
+// ============================================================
+// MOVE PLAYER X
+// ============================================================
+
+function movePlayerX(
+    amount
+) {
+
+    if(
+        amount ===
+        0
+    ) {
+
+        return;
+
+    }
+
+
+    const targetX =
+        camera.position.x +
+        amount;
+
+
+    if(
+        !playerCollidesAt(
+
+            targetX,
+
+            camera.position.y,
+
+            camera.position.z
+
+        )
+    ) {
+
+        camera.position.x =
+            targetX;
+
+        return;
+
+    }
+
+
+    // Collision:
+    // stop horizontal X velocity.
+
+    velocity.x = 0;
+
+}
+
+
+// ============================================================
+// MOVE PLAYER Z
+// ============================================================
+
+function movePlayerZ(
+    amount
+) {
+
+    if(
+        amount ===
+        0
+    ) {
+
+        return;
+
+    }
+
+
+    const targetZ =
+        camera.position.z +
+        amount;
+
+
+    if(
+        !playerCollidesAt(
+
+            camera.position.x,
+
+            camera.position.y,
+
+            targetZ
+
+        )
+    ) {
+
+        camera.position.z =
+            targetZ;
+
+        return;
+
+    }
+
+
+    velocity.z = 0;
+
+}
+
+
+// ============================================================
+// MOVE PLAYER Y
+//
+// Uses small steps so gravity cannot tunnel through blocks.
+// ============================================================
+
+function movePlayerY(
+    amount
+) {
+
+    if(
+        amount ===
+        0
+    ) {
+
+        return;
+
+    }
+
+
+    const direction =
+        Math.sign(
+            amount
+        );
+
+
+    let remaining =
+        Math.abs(
+            amount
+        );
+
+
+    const maxStep =
+        0.08;
+
+
+    while(
+        remaining >
+        0
+    ) {
+
+        const step =
+            Math.min(
+                maxStep,
+                remaining
+            ) *
+            direction;
+
+
+        const targetY =
+            camera.position.y +
+            step;
+
+
+        if(
+            playerCollidesAt(
+
+                camera.position.x,
+
+                targetY,
+
+                camera.position.z
+
+            )
+        ) {
+
+            // Falling down onto floor.
+
+            if(
+                direction <
+                0
+            ) {
+
+                canJump =
+                    true;
+
+            }
+
+
+            // Hit floor or ceiling.
+
+            velocity.y =
+                0;
+
+
+            return;
+
+        }
+
+
+        camera.position.y =
+            targetY;
+
+
+        remaining -=
+            Math.abs(
+                step
+            );
+
+    }
+
+
+    if(
+        direction <
+        0
+    ) {
+
+        canJump =
+            false;
+
+    }
+
+}
+
+
+// ============================================================
+// MOVE PLAYER HORIZONTALLY
+//
+// Uses camera direction, but collisions are applied
+// independently on X and Z.
+// ============================================================
+
+const forwardVector =
     new THREE.Vector3();
 
 
-// ============================================================
-// SPAWN
-// ============================================================
+const rightVector =
+    new THREE.Vector3();
 
-let spawnX = 0;
 
-let spawnZ = 0;
+function updateHorizontalMovement(
+    delta
+) {
 
-let spawnY =
-    terrainHeight(
-        spawnX,
-        spawnZ
+    let inputForward = 0;
+
+    let inputRight = 0;
+
+
+    if(moveForward)
+        inputForward += 1;
+
+
+    if(moveBackward)
+        inputForward -= 1;
+
+
+    if(moveRight)
+        inputRight += 1;
+
+
+    if(moveLeft)
+        inputRight -= 1;
+
+
+    if(
+        inputForward === 0 &&
+        inputRight === 0
+    ) {
+
+        return;
+
+    }
+
+
+    camera.getWorldDirection(
+        forwardVector
     );
 
 
-if(
-    spawnY <=
-    SEA_LEVEL
-) {
+    // Ignore camera pitch.
 
-    for(
-        let radius = 1;
-        radius < 30;
-        radius++
+    forwardVector.y = 0;
+
+
+    forwardVector.normalize();
+
+
+    rightVector.set(
+
+        forwardVector.z,
+
+        0,
+
+        -forwardVector.x
+
+    );
+
+
+    const length =
+        Math.sqrt(
+
+            inputForward *
+            inputForward +
+
+            inputRight *
+            inputRight
+
+        );
+
+
+    inputForward /=
+        length;
+
+
+    inputRight /=
+        length;
+
+
+    let speed =
+        WALK_SPEED;
+
+
+    if(
+        playerInWater
     ) {
 
-        let found =
-            false;
+        speed *=
+            0.55;
 
+    }
+
+
+    const moveX =
+        (
+            forwardVector.x *
+            inputForward +
+
+            rightVector.x *
+            inputRight
+        ) *
+        speed *
+        delta;
+
+
+    const moveZ =
+        (
+            forwardVector.z *
+            inputForward +
+
+            rightVector.z *
+            inputRight
+        ) *
+        speed *
+        delta;
+
+
+    // Separate axes:
+    // lets player slide along walls.
+
+    movePlayerX(
+        moveX
+    );
+
+
+    movePlayerZ(
+        moveZ
+    );
+
+}
+
+
+// ============================================================
+// SAFE SPAWN TEST
+// ============================================================
+
+function isSafeSpawn(
+    x,
+    groundY,
+    z
+) {
+
+    // Spawn eye position.
+
+    const eyeY =
+        groundY +
+        0.5 +
+        PLAYER_EYE_HEIGHT +
+        0.02;
+
+
+    // Ground must actually be solid.
+
+    if(
+        !isSolidBlock(
+            x,
+            groundY,
+            z
+        )
+    ) {
+
+        return false;
+
+    }
+
+
+    // Avoid underwater spawn.
+
+    if(
+        groundY <=
+        SEA_LEVEL
+    ) {
+
+        return false;
+
+    }
+
+
+    // Player body must fit.
+
+    if(
+        playerCollidesAt(
+            x,
+            eyeY,
+            z
+        )
+    ) {
+
+        return false;
+
+    }
+
+
+    // Don't spawn inside water.
+
+    const feetY =
+        eyeY -
+        PLAYER_EYE_HEIGHT;
+
+
+    if(
+        isWaterBlock(
+            x,
+            Math.floor(
+                feetY +
+                0.5
+            ),
+            z
+        )
+    ) {
+
+        return false;
+
+    }
+
+
+    return true;
+
+}
+
+
+// ============================================================
+// FIND SAFE SPAWN
+// ============================================================
+
+function findSafeSpawn() {
+
+    for(
+        let radius = 0;
+        radius <= 40;
+        radius++
+    ) {
 
         for(
             let x =
@@ -1733,7 +3073,23 @@ if(
                 z++
             ) {
 
-                const h =
+                // Only inspect perimeter at larger radii.
+
+                if(
+                    radius >
+                    0 &&
+                    Math.abs(x) !==
+                        radius &&
+                    Math.abs(z) !==
+                        radius
+                ) {
+
+                    continue;
+
+                }
+
+
+                const ground =
                     terrainHeight(
                         x,
                         z
@@ -1741,60 +3097,119 @@ if(
 
 
                 if(
-                    h >
-                    SEA_LEVEL +
-                    1
+                    isSafeSpawn(
+                        x,
+                        ground,
+                        z
+                    )
                 ) {
 
-                    spawnX = x;
+                    return {
 
-                    spawnZ = z;
+                        x,
 
-                    spawnY = h;
+                        groundY:
+                            ground,
 
-                    found = true;
+                        z
 
-                    break;
+                    };
 
                 }
 
             }
 
-
-            if(found)
-                break;
-
         }
 
-
-        if(found)
-            break;
-
     }
+
+
+    // Emergency fallback.
+
+    return {
+
+        x: 0,
+
+        groundY:
+            terrainHeight(
+                0,
+                0
+            ),
+
+        z: 0
+
+    };
 
 }
 
 
-camera.position.set(
+// ============================================================
+// SPAWN / RESPAWN
+// ============================================================
 
-    spawnX,
-
-    spawnY +
-    PLAYER_HEIGHT +
-    0.2,
-
-    spawnZ
-
-);
+let spawnPoint =
+    findSafeSpawn();
 
 
-updateChunks(
-    true
-);
+function respawnPlayer() {
+
+    // Re-check spawn in case the player modified it.
+
+    if(
+        !isSafeSpawn(
+
+            spawnPoint.x,
+
+            spawnPoint.groundY,
+
+            spawnPoint.z
+
+        )
+    ) {
+
+        spawnPoint =
+            findSafeSpawn();
+
+    }
+
+
+    camera.position.set(
+
+        spawnPoint.x,
+
+        spawnPoint.groundY +
+            0.5 +
+            PLAYER_EYE_HEIGHT +
+            0.02,
+
+        spawnPoint.z
+
+    );
+
+
+    velocity.set(
+        0,
+        0,
+        0
+    );
+
+
+    canJump =
+        false;
+
+
+    updateChunks(
+        true
+    );
+
+}
+
+
+respawnPlayer();
 
 
 // ============================================================
-// BLOCK TARGETING
+// BLOCK RAYCASTING
 // ============================================================
 
 const raycaster =
@@ -1826,9 +3241,9 @@ const outline =
         new THREE.EdgesGeometry(
 
             new THREE.BoxGeometry(
-                1.03,
-                1.03,
-                1.03
+                1.025,
+                1.025,
+                1.025
             )
 
         ),
@@ -1853,7 +3268,7 @@ scene.add(
 
 
 // ============================================================
-// UPDATE TARGET
+// UPDATE BLOCK TARGET
 // ============================================================
 
 function updateTarget() {
@@ -1898,7 +3313,9 @@ function updateTarget() {
         ) {
 
             if(
-                child.isInstancedMesh
+                child.isInstancedMesh &&
+                child.userData.blockType !==
+                    "water"
             ) {
 
                 objects.push(
@@ -1937,14 +3354,41 @@ function updateTarget() {
         hit.object;
 
 
-    const type =
-        mesh.userData.blockType;
+    const positions =
+        mesh.userData.positions;
 
-
-    // Don't target water.
 
     if(
-        type ===
+        hit.instanceId ===
+        undefined
+    ) {
+
+        return;
+
+    }
+
+
+    const p =
+        positions[
+            hit.instanceId
+        ];
+
+
+    if(!p)
+        return;
+
+
+    const actualType =
+        getBlock(
+            p.x,
+            p.y,
+            p.z
+        );
+
+
+    if(
+        !actualType ||
+        actualType ===
         "water"
     ) {
 
@@ -1953,46 +3397,26 @@ function updateTarget() {
     }
 
 
-    const positions =
-        mesh.userData.positions;
-
-
-    if(
-        hit.instanceId ===
-        undefined ||
-        !positions[
-            hit.instanceId
-        ]
-    ) {
-
-        return;
-
-    }
-
-
-    const position =
-        positions[
-            hit.instanceId
-        ];
-
-
     targetedBlock = {
 
         x:
-            position.x,
+            p.x,
 
         y:
-            position.y,
+            p.y,
 
         z:
-            position.z,
+            p.z,
 
-        type,
+        type:
+            actualType,
 
         normal:
             hit.face
-                ? hit.face.normal.clone()
-                : new THREE.Vector3(
+                ?
+                hit.face.normal.clone()
+                :
+                new THREE.Vector3(
                     0,
                     1,
                     0
@@ -2002,13 +3426,9 @@ function updateTarget() {
 
 
     outline.position.set(
-
-        position.x,
-
-        position.y,
-
-        position.z
-
+        p.x,
+        p.y,
+        p.z
     );
 
 
@@ -2037,6 +3457,24 @@ function breakBlock() {
         targetedBlock;
 
 
+    const definition =
+        BLOCKS[
+            b.type
+        ];
+
+
+    if(
+        !definition ||
+        !definition.breakable
+    ) {
+
+        return;
+
+    }
+
+
+    // Actual block becomes empty.
+
     modifications.set(
 
         blockKey(
@@ -2049,6 +3487,8 @@ function breakBlock() {
 
     );
 
+
+    // Give block to inventory.
 
     Inventory.addItem(
         b.type,
@@ -2073,108 +3513,57 @@ function breakBlock() {
 
 
 // ============================================================
-// PLAYER/BLOCK INTERSECTION
+// CAN PLACE BLOCK
 // ============================================================
 
-function blockIntersectsPlayer(
+function canPlaceBlock(
     x,
     y,
     z
 ) {
 
-    const px =
-        camera.position.x;
+    const existing =
+        getBlock(
+            x,
+            y,
+            z
+        );
 
 
-    const py =
-        camera.position.y;
+    // Can place in air or replace water.
+
+    if(
+        existing &&
+        existing !==
+        "water"
+    ) {
+
+        return false;
+
+    }
 
 
-    const pz =
-        camera.position.z;
+    // Temporarily imagine block exists.
+
+    const box =
+        getPlayerAABB();
 
 
-    const blockMinX =
-        x -
-        0.5;
+    if(
+        aabbIntersectsBlock(
+            box,
+            x,
+            y,
+            z
+        )
+    ) {
+
+        return false;
+
+    }
 
 
-    const blockMaxX =
-        x +
-        0.5;
-
-
-    const blockMinY =
-        y -
-        0.5;
-
-
-    const blockMaxY =
-        y +
-        0.5;
-
-
-    const blockMinZ =
-        z -
-        0.5;
-
-
-    const blockMaxZ =
-        z +
-        0.5;
-
-
-    const playerMinX =
-        px -
-        PLAYER_RADIUS;
-
-
-    const playerMaxX =
-        px +
-        PLAYER_RADIUS;
-
-
-    const playerMinY =
-        py -
-        PLAYER_HEIGHT;
-
-
-    const playerMaxY =
-        py +
-        0.1;
-
-
-    const playerMinZ =
-        pz -
-        PLAYER_RADIUS;
-
-
-    const playerMaxZ =
-        pz +
-        PLAYER_RADIUS;
-
-
-    return (
-
-        playerMaxX >
-        blockMinX &&
-
-        playerMinX <
-        blockMaxX &&
-
-        playerMaxY >
-        blockMinY &&
-
-        playerMinY <
-        blockMaxY &&
-
-        playerMaxZ >
-        blockMinZ &&
-
-        playerMinZ <
-        blockMaxZ
-
-    );
+    return true;
 
 }
 
@@ -2242,7 +3631,7 @@ function placeBlock() {
 
 
     if(
-        blockIntersectsPlayer(
+        !canPlaceBlock(
             x,
             y,
             z
@@ -2281,7 +3670,7 @@ function placeBlock() {
 
 
 // ============================================================
-// MOUSE
+// MOUSE INPUT
 // ============================================================
 
 renderer.domElement.addEventListener(
@@ -2332,7 +3721,7 @@ renderer.domElement.addEventListener(
 
 
 // ============================================================
-// KEYBOARD
+// KEYBOARD INPUT
 // ============================================================
 
 document.addEventListener(
@@ -2386,7 +3775,23 @@ document.addEventListener(
 
             case "Space":
 
-                if(canJump) {
+                event.preventDefault();
+
+
+                if(
+                    playerInWater
+                ) {
+
+                    // Swim upward.
+
+                    velocity.y =
+                        4.2;
+
+                }
+
+                else if(
+                    canJump
+                ) {
 
                     velocity.y =
                         JUMP_FORCE;
@@ -2494,11 +3899,14 @@ controls.addEventListener(
         moveForward =
             false;
 
+
         moveBackward =
             false;
 
+
         moveLeft =
             false;
+
 
         moveRight =
             false;
@@ -2518,7 +3926,7 @@ controls.addEventListener(
 
 
 // ============================================================
-// GAME API FOR INVENTORY
+// INVENTORY API
 // ============================================================
 
 window.Game = {
@@ -2543,7 +3951,7 @@ window.Game = {
 
 
 // ============================================================
-// RESIZE
+// WINDOW RESIZE
 // ============================================================
 
 window.addEventListener(
@@ -2571,7 +3979,7 @@ window.addEventListener(
 
 
 // ============================================================
-// DEBUG UI
+// DEBUG DISPLAY
 // ============================================================
 
 const fpsDisplay =
@@ -2592,12 +4000,9 @@ const chunkDisplay =
     );
 
 
-let frameCounter =
-    0;
+let frameCounter = 0;
 
-
-let fpsTimer =
-    0;
+let fpsTimer = 0;
 
 
 // ============================================================
@@ -2606,6 +4011,137 @@ let fpsTimer =
 
 const clock =
     new THREE.Clock();
+
+
+// ============================================================
+// WATER VISUAL EFFECT
+// ============================================================
+
+let waterAnimationTime = 0;
+
+
+function updateWaterVisuals(
+    delta
+) {
+
+    waterAnimationTime +=
+        delta;
+
+
+    const brightness =
+        0.51 +
+        Math.sin(
+            waterAnimationTime *
+            0.6
+        ) *
+        0.015;
+
+
+    blockMaterials.water
+        .color
+        .setHSL(
+
+            0.56,
+
+            0.70,
+
+            brightness
+
+        );
+
+}
+
+
+// ============================================================
+// PLAYER PHYSICS
+// ============================================================
+
+function updatePlayer(
+    delta
+) {
+
+    updateWaterState();
+
+
+    // ========================================================
+    // HORIZONTAL MOVEMENT
+    // ========================================================
+
+    updateHorizontalMovement(
+        delta
+    );
+
+
+    // ========================================================
+    // GRAVITY
+    // ========================================================
+
+    if(
+        playerInWater
+    ) {
+
+        // Reduced gravity underwater.
+
+        velocity.y -=
+            GRAVITY *
+            0.18 *
+            delta;
+
+
+        // Water drag.
+
+        velocity.y *=
+            Math.pow(
+                0.93,
+                delta *
+                60
+            );
+
+    }
+
+    else {
+
+        velocity.y -=
+            GRAVITY *
+            delta;
+
+    }
+
+
+    // ========================================================
+    // VERTICAL COLLISION
+    // ========================================================
+
+    movePlayerY(
+
+        velocity.y *
+        delta
+
+    );
+
+
+    // ========================================================
+    // CHUNKS
+    // ========================================================
+
+    updateChunks();
+
+
+    // ========================================================
+    // VOID
+    // ========================================================
+
+    if(
+        camera.position.y <
+        WORLD_BOTTOM -
+        15
+    ) {
+
+        respawnPlayer();
+
+    }
+
+}
 
 
 // ============================================================
@@ -2627,7 +4163,7 @@ function animate() {
 
 
     // ========================================================
-    // PLAYER MOVEMENT
+    // PLAYER
     // ========================================================
 
     if(
@@ -2635,148 +4171,27 @@ function animate() {
         !Inventory.isOpen()
     ) {
 
-        velocity.x -=
-            velocity.x *
-            10 *
-            delta;
-
-
-        velocity.z -=
-            velocity.z *
-            10 *
-            delta;
-
-
-        velocity.y -=
-            GRAVITY *
-            delta;
-
-
-        direction.z =
-            Number(
-                moveForward
-            ) -
-            Number(
-                moveBackward
-            );
-
-
-        direction.x =
-            Number(
-                moveRight
-            ) -
-            Number(
-                moveLeft
-            );
-
-
-        direction.normalize();
-
-
-        if(
-            moveForward ||
-            moveBackward
-        ) {
-
-            velocity.z -=
-                direction.z *
-                WALK_SPEED *
-                delta;
-
-        }
-
-
-        if(
-            moveLeft ||
-            moveRight
-        ) {
-
-            velocity.x -=
-                direction.x *
-                WALK_SPEED *
-                delta;
-
-        }
-
-
-        controls.moveRight(
-
-            -velocity.x *
+        updatePlayer(
             delta
-
         );
-
-
-        controls.moveForward(
-
-            -velocity.z *
-            delta
-
-        );
-
-
-        camera.position.y +=
-            velocity.y *
-            delta;
-
-
-        // ====================================================
-        // SIMPLE GROUND COLLISION
-        // ====================================================
-
-        const x =
-            Math.round(
-                camera.position.x
-            );
-
-
-        const z =
-            Math.round(
-                camera.position.z
-            );
-
-
-        const terrain =
-            terrainHeight(
-                x,
-                z
-            );
-
-
-        const ground =
-            terrain +
-            PLAYER_HEIGHT;
-
-
-        if(
-            camera.position.y <=
-            ground
-        ) {
-
-            camera.position.y =
-                ground;
-
-
-            velocity.y =
-                0;
-
-
-            canJump =
-                true;
-
-        }
-
-
-        updateChunks();
 
     }
 
 
     // ========================================================
-    // TARGET BLOCK
+    // BLOCK TARGET
     // ========================================================
 
     updateTarget();
+
+
+    // ========================================================
+    // WATER
+    // ========================================================
+
+    updateWaterVisuals(
+        delta
+    );
 
 
     // ========================================================
@@ -2789,10 +4204,11 @@ function animate() {
 
 
     // ========================================================
-    // DEBUG
+    // FPS
     // ========================================================
 
     frameCounter++;
+
 
     fpsTimer +=
         delta;
@@ -2806,43 +4222,64 @@ function animate() {
         fpsDisplay.textContent =
             "FPS: " +
             Math.round(
+
                 frameCounter /
                 fpsTimer
+
             );
 
 
-        frameCounter =
-            0;
+        frameCounter = 0;
 
-
-        fpsTimer =
-            0;
+        fpsTimer = 0;
 
     }
 
 
+    // ========================================================
+    // COORDINATES
+    // ========================================================
+
     coordinateDisplay.textContent =
+
         "XYZ: " +
+
         camera.position.x
             .toFixed(1) +
+
         " / " +
+
         camera.position.y
             .toFixed(1) +
+
         " / " +
+
         camera.position.z
             .toFixed(1);
 
 
     chunkDisplay.textContent =
+
         "Chunk: " +
+
         (
             playerChunkX ??
             0
         ) +
+
         " / " +
+
         (
             playerChunkZ ??
             0
+        ) +
+
+        (
+            playerInWater
+                ?
+                " | WATER"
+                :
+                ""
         );
 
 
