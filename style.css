@@ -1,59 +1,946 @@
-lbody {
+/* =========================================================
+   GLOBAL
+========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
     margin: 0;
-    overflow: hidden;
-    background: black;
-}
-
-/* GAME AREA */
-#game-container {
-    width: 100vw;
-    height: 100vh;
-    position: relative;
-    outline: none;
-}
-
-/* UI LAYER (does NOT block clicks) */
-#ui-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
+    overflow: hidden;
+
+    background: #000;
+
+    font-family:
+        "Courier New",
+        monospace;
+
+    user-select: none;
+}
+
+button {
+    font-family:
+        "Courier New",
+        monospace;
+}
+
+
+/* =========================================================
+   GAME CANVAS
+========================================================= */
+
+#game-container {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+
+    width: 100vw;
+    height: 100vh;
+
+    z-index: 0;
+}
+
+#game-container canvas {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+}
+
+
+/* =========================================================
+   START SCREEN
+========================================================= */
+
+#start-screen {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 5000;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    background:
+        linear-gradient(
+            rgba(0,0,0,0.30),
+            rgba(0,0,0,0.60)
+        );
+
+    backdrop-filter: blur(3px);
+}
+
+.start-panel {
+    width: min(
+        500px,
+        90vw
+    );
+
+    padding: 35px;
+
+    text-align: center;
+
+    color: white;
+
+    background:
+        rgba(
+            20,
+            20,
+            20,
+            0.90
+        );
+
+    border:
+        4px solid
+        #080808;
+
+    box-shadow:
+        inset 0 0 0 3px #555,
+        0 10px 40px rgba(0,0,0,.65);
+}
+
+.start-panel h1 {
+    margin:
+        0 0 12px;
+
+    font-size:
+        clamp(
+            30px,
+            7vw,
+            54px
+        );
+
+    letter-spacing: 4px;
+
+    text-shadow:
+        4px 4px 0 #222;
+}
+
+.start-panel p {
+    color: #ddd;
+
+    margin-bottom: 25px;
+}
+
+#play-button {
+    width: 220px;
+
+    padding: 14px;
+
+    border:
+        3px solid #111;
+
+    outline:
+        2px solid #aaa;
+
+    background: #777;
+
+    color: white;
+
+    font-size: 20px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+    text-shadow:
+        2px 2px #333;
+}
+
+#play-button:hover {
+    background: #929292;
+}
+
+#play-button:active {
+    transform:
+        translateY(2px);
+}
+
+.controls-help {
+    margin-top: 28px;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap: 9px;
+
+    font-size: 12px;
+
+    color: #ccc;
+}
+
+
+/* =========================================================
+   HUD
+========================================================= */
+
+#hud {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 100;
+
     pointer-events: none;
 }
 
-/* HOTBAR */
+
+/* =========================================================
+   DEBUG
+========================================================= */
+
+#debug-info {
+    position: absolute;
+
+    top: 15px;
+    left: 15px;
+
+    padding: 9px 12px;
+
+    color: white;
+
+    font-size: 13px;
+
+    line-height: 1.5;
+
+    text-shadow:
+        2px 2px 2px #000;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            .25
+        );
+}
+
+
+/* =========================================================
+   CROSSHAIR
+========================================================= */
+
+#crosshair {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    width: 20px;
+    height: 20px;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+.crosshair-horizontal {
+    position: absolute;
+
+    left: 0;
+    top: 9px;
+
+    width: 20px;
+    height: 2px;
+
+    background: white;
+
+    box-shadow:
+        0 0 2px black;
+}
+
+.crosshair-vertical {
+    position: absolute;
+
+    left: 9px;
+    top: 0;
+
+    width: 2px;
+    height: 20px;
+
+    background: white;
+
+    box-shadow:
+        0 0 2px black;
+}
+
+
+/* =========================================================
+   SELECTED ITEM NAME
+========================================================= */
+
+#selected-item-name {
+    position: absolute;
+
+    left: 50%;
+
+    bottom: 92px;
+
+    transform:
+        translateX(-50%);
+
+    color: white;
+
+    font-size: 14px;
+
+    padding:
+        4px 9px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            .4
+        );
+
+    text-shadow:
+        2px 2px #000;
+
+    opacity: 0;
+
+    transition:
+        opacity .15s;
+}
+
+#selected-item-name.visible {
+    opacity: 1;
+}
+
+
+/* =========================================================
+   HOTBAR
+========================================================= */
+
 #hotbar {
     position: absolute;
-    bottom: 20px;
+
     left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
+
+    bottom: 20px;
+
+    transform:
+        translateX(-50%);
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            9,
+            58px
+        );
+
+    gap: 2px;
+
+    padding: 4px;
+
+    background:
+        rgba(
+            20,
+            20,
+            20,
+            .70
+        );
+
+    border:
+        2px solid
+        rgba(
+            0,
+            0,
+            0,
+            .8
+        );
 }
+
+
+/* =========================================================
+   GENERIC SLOT
+========================================================= */
 
 .slot {
-    width: 50px;
-    height: 50px;
-    border: 2px solid white;
-    background: rgba(255,255,255,0.1);
+    position: relative;
+
+    width: 58px;
+    height: 58px;
+
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+
+    background:
+        rgba(
+            80,
+            80,
+            80,
+            .72
+        );
+
+    border:
+        3px solid;
+
+    border-top-color:
+        #aaa;
+
+    border-left-color:
+        #aaa;
+
+    border-right-color:
+        #333;
+
+    border-bottom-color:
+        #333;
 }
 
-/* INVENTORY */
-#inventory {
+.slot.selected {
+    border:
+        4px solid white;
+
+    box-shadow:
+        0 0 0 2px #222;
+
+    transform:
+        scale(1.08);
+
+    z-index: 2;
+}
+
+
+/* =========================================================
+   BLOCK ICON
+========================================================= */
+
+.item-icon {
+    width: 36px;
+    height: 36px;
+
+    border:
+        2px solid
+        rgba(
+            0,
+            0,
+            0,
+            .30
+        );
+
+    box-shadow:
+        inset 4px 4px
+        rgba(
+            255,
+            255,
+            255,
+            .13
+        ),
+        inset -4px -4px
+        rgba(
+            0,
+            0,
+            0,
+            .16
+        );
+}
+
+.item-grass {
+    background:
+        linear-gradient(
+            to bottom,
+            #63a744 0%,
+            #63a744 32%,
+            #785238 32%,
+            #785238 100%
+        );
+}
+
+.item-dirt {
+    background:
+        #795238;
+}
+
+.item-stone {
+    background:
+        #7c7c7c;
+}
+
+.item-sand {
+    background:
+        #cfbd78;
+}
+
+.item-log {
+    background:
+        repeating-linear-gradient(
+            90deg,
+            #6d472c,
+            #6d472c 6px,
+            #815b37 6px,
+            #815b37 10px
+        );
+}
+
+.item-leaves {
+    background:
+        #397c36;
+}
+
+.item-water {
+    background:
+        rgba(
+            37,
+            142,
+            220,
+            .80
+        );
+}
+
+
+/* =========================================================
+   STACK COUNT
+========================================================= */
+
+.item-count {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: grid;
-    grid-template-columns: repeat(9, 50px);
-    gap: 8px;
-    display: none;
+
+    right: 4px;
+    bottom: 1px;
+
+    color: white;
+
+    font-size: 17px;
+
+    font-weight: bold;
+
+    text-shadow:
+        2px 2px 0 #111;
 }
 
-.inv-slot {
-    width: 50px;
+
+/* =========================================================
+   HOTBAR NUMBER
+========================================================= */
+
+.slot-number {
+    position: absolute;
+
+    left: 3px;
+    top: 2px;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            .70
+        );
+
+    font-size: 10px;
+
+    text-shadow:
+        1px 1px #000;
+}
+
+
+/* =========================================================
+   INVENTORY OVERLAY
+========================================================= */
+
+#inventory-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 3000;
+
+    display: none;
+
+    justify-content: center;
+    align-items: center;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            .45
+        );
+}
+
+#inventory-overlay.open {
+    display: flex;
+}
+
+
+/* =========================================================
+   INVENTORY WINDOW
+========================================================= */
+
+#inventory-window {
+    width: 610px;
+
+    max-width: 94vw;
+
+    padding: 14px;
+
+    color: #222;
+
+    background: #c6c6c6;
+
+    border:
+        4px solid;
+
+    border-top-color:
+        #f5f5f5;
+
+    border-left-color:
+        #f5f5f5;
+
+    border-right-color:
+        #555;
+
+    border-bottom-color:
+        #555;
+
+    box-shadow:
+        0 12px 45px
+        rgba(
+            0,
+            0,
+            0,
+            .75
+        );
+}
+
+.inventory-header {
+    display: flex;
+
+    justify-content:
+        space-between;
+
+    align-items: center;
+
+    margin-bottom: 12px;
+
+    padding-bottom: 8px;
+
+    border-bottom:
+        2px solid #777;
+
+    font-size: 20px;
+
+    font-weight: bold;
+}
+
+#inventory-close {
+    width: 32px;
+    height: 32px;
+
+    padding: 0;
+
+    border: 2px solid #555;
+
+    background: #aaa;
+
+    font-size: 23px;
+
+    cursor: pointer;
+}
+
+#inventory-close:hover {
+    background: #ddd;
+}
+
+
+/* =========================================================
+   INVENTORY TOP
+========================================================= */
+
+.inventory-top {
+    display: flex;
+
+    align-items: center;
+
+    gap: 25px;
+
+    margin-bottom: 18px;
+}
+
+
+/* =========================================================
+   PLAYER PREVIEW
+========================================================= */
+
+.player-preview {
+    position: relative;
+
+    width: 110px;
+    height: 145px;
+
+    background:
+        #252525;
+
+    border:
+        3px inset #888;
+
+    overflow: hidden;
+}
+
+.player-head {
+    position: absolute;
+
+    width: 34px;
+    height: 34px;
+
+    left: 38px;
+    top: 15px;
+
+    background: #c88e62;
+}
+
+.player-body {
+    position: absolute;
+
+    width: 38px;
     height: 50px;
-    border: 2px solid white;
-    background: rgba(255,255,255,0.1);
+
+    left: 36px;
+    top: 49px;
+
+    background: #3c89a8;
+}
+
+.player-left-arm,
+.player-right-arm {
+    position: absolute;
+
+    width: 15px;
+    height: 50px;
+
+    top: 49px;
+
+    background: #c88e62;
+}
+
+.player-left-arm {
+    left: 20px;
+}
+
+.player-right-arm {
+    right: 20px;
+}
+
+.player-left-leg,
+.player-right-leg {
+    position: absolute;
+
+    width: 18px;
+    height: 42px;
+
+    top: 99px;
+
+    background: #38468d;
+}
+
+.player-left-leg {
+    left: 36px;
+}
+
+.player-right-leg {
+    right: 36px;
+}
+
+
+/* =========================================================
+   INVENTORY INFO
+========================================================= */
+
+.inventory-info {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+    font-size: 13px;
+
+    color: #555;
+}
+
+.inventory-info strong {
+    color: #222;
+
+    font-size: 17px;
+}
+
+
+/* =========================================================
+   INVENTORY LABEL
+========================================================= */
+
+.inventory-label {
+    margin:
+        5px 0 6px;
+
+    font-size: 13px;
+
+    color: #444;
+}
+
+.hotbar-label {
+    margin-top: 18px;
+}
+
+
+/* =========================================================
+   INVENTORY GRIDS
+========================================================= */
+
+#inventory-grid,
+#inventory-hotbar {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            9,
+            58px
+        );
+
+    gap: 3px;
+
+    justify-content: center;
+}
+
+.inventory-slot {
+    cursor: pointer;
+}
+
+.inventory-slot:hover {
+    filter:
+        brightness(1.18);
+}
+
+
+/* =========================================================
+   TOOLTIP
+========================================================= */
+
+#item-tooltip {
+    position: fixed;
+
+    z-index: 9000;
+
+    display: none;
+
+    pointer-events: none;
+
+    padding:
+        7px 10px;
+
+    color: white;
+
+    background:
+        rgba(
+            20,
+            10,
+            35,
+            .95
+        );
+
+    border:
+        2px solid
+        #5b3c7a;
+
+    font-size: 13px;
+
+    text-shadow:
+        1px 1px black;
+}
+
+
+/* =========================================================
+   CURSOR ITEM
+========================================================= */
+
+#cursor-item {
+    position: fixed;
+
+    z-index: 10000;
+
+    width: 48px;
+    height: 48px;
+
+    display: none;
+
+    pointer-events: none;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+}
+
+#cursor-item .item-icon {
+    width: 38px;
+    height: 38px;
+}
+
+
+/* =========================================================
+   MOBILE / SMALL WINDOW
+========================================================= */
+
+@media (
+    max-width: 650px
+) {
+
+    #hotbar {
+        grid-template-columns:
+            repeat(
+                9,
+                42px
+            );
+    }
+
+    #hotbar .slot {
+        width: 42px;
+        height: 42px;
+    }
+
+    #hotbar .item-icon {
+        width: 27px;
+        height: 27px;
+    }
+
+    #inventory-grid,
+    #inventory-hotbar {
+        grid-template-columns:
+            repeat(
+                9,
+                42px
+            );
+    }
+
+    #inventory-window
+    .slot {
+        width: 42px;
+        height: 42px;
+    }
+
+    #inventory-window
+    .item-icon {
+        width: 28px;
+        height: 28px;
+    }
+
 }

@@ -2,75 +2,230 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Game</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <!-- Compatible Three.js + PointerLockControls versions -->
+    <title>Block World</title>
+
+    <!-- THREE.JS -->
     <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+
+    <!-- POINTER LOCK -->
     <script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 </head>
 
 <body>
 
-    <!-- GAME CANVAS -->
+    <!-- ===================================================
+         GAME
+    ==================================================== -->
+
     <div id="game-container"></div>
 
-    <!-- UI LAYER -->
-    <div id="ui-layer">
 
-        <!-- Hotbar -->
-        <div id="hotbar">
-            <div class="slot" id="slot-0"></div>
-            <div class="slot" id="slot-1"></div>
-            <div class="slot" id="slot-2"></div>
-            <div class="slot" id="slot-3"></div>
-            <div class="slot" id="slot-4"></div>
-            <div class="slot" id="slot-5"></div>
-            <div class="slot" id="slot-6"></div>
-            <div class="slot" id="slot-7"></div>
-            <div class="slot" id="slot-8"></div>
-        </div>
+    <!-- ===================================================
+         START SCREEN
+    ==================================================== -->
 
-        <!-- Inventory -->
-        <div id="inventory">
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
+    <div id="start-screen">
 
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
+        <div class="start-panel">
 
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
-            <div class="inv-slot"></div>
+            <h1>BLOCK WORLD</h1>
+
+            <p>
+                Click to enter the world
+            </p>
+
+            <button id="play-button">
+                PLAY
+            </button>
+
+            <div class="controls-help">
+
+                <span>WASD — Move</span>
+
+                <span>SPACE — Jump</span>
+
+                <span>LEFT CLICK — Break</span>
+
+                <span>RIGHT CLICK — Place</span>
+
+                <span>E — Inventory</span>
+
+                <span>1–9 / Wheel — Hotbar</span>
+
+            </div>
+
         </div>
 
     </div>
 
-    <script src="main.js"></script>
+
+    <!-- ===================================================
+         GAME HUD
+    ==================================================== -->
+
+    <div id="hud">
+
+        <!-- DEBUG -->
+
+        <div id="debug-info">
+
+            <div id="fps-display">
+                FPS: 0
+            </div>
+
+            <div id="coordinate-display">
+                XYZ: 0 / 0 / 0
+            </div>
+
+            <div id="chunk-display">
+                Chunk: 0 / 0
+            </div>
+
+        </div>
+
+
+        <!-- CROSSHAIR -->
+
+        <div id="crosshair">
+
+            <div class="crosshair-horizontal"></div>
+
+            <div class="crosshair-vertical"></div>
+
+        </div>
+
+
+        <!-- BLOCK NAME -->
+
+        <div id="selected-item-name">
+            Grass Block
+        </div>
+
+
+        <!-- HOTBAR -->
+
+        <div id="hotbar"></div>
+
+    </div>
+
+
+    <!-- ===================================================
+         INVENTORY
+    ==================================================== -->
+
+    <div id="inventory-overlay">
+
+        <div id="inventory-window">
+
+            <div class="inventory-header">
+
+                <span>
+                    Inventory
+                </span>
+
+                <button id="inventory-close">
+                    ×
+                </button>
+
+            </div>
+
+
+            <!-- PLAYER PREVIEW -->
+
+            <div class="inventory-top">
+
+                <div class="player-preview">
+
+                    <div class="player-head"></div>
+
+                    <div class="player-body"></div>
+
+                    <div class="player-left-arm"></div>
+
+                    <div class="player-right-arm"></div>
+
+                    <div class="player-left-leg"></div>
+
+                    <div class="player-right-leg"></div>
+
+                </div>
+
+
+                <div class="inventory-info">
+
+                    <strong>
+                        Survival Inventory
+                    </strong>
+
+                    <span>
+                        Drag items between slots
+                    </span>
+
+                    <span>
+                        Blocks stack up to 64
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- BACKPACK -->
+
+            <div class="inventory-label">
+                Backpack
+            </div>
+
+            <div id="inventory-grid"></div>
+
+
+            <!-- INVENTORY HOTBAR -->
+
+            <div class="inventory-label hotbar-label">
+                Hotbar
+            </div>
+
+            <div id="inventory-hotbar"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================
+         TOOLTIP
+    ==================================================== -->
+
+    <div id="item-tooltip"></div>
+
+
+    <!-- ===================================================
+         HELD / DRAGGED ITEM
+    ==================================================== -->
+
+    <div id="cursor-item"></div>
+
+
+    <!-- ===================================================
+         SCRIPTS
+    ==================================================== -->
+
+    <!-- Inventory must load first -->
     <script src="inventory.js"></script>
+
+    <!-- World/game loads second -->
+    <script src="main.js"></script>
 
 </body>
 </html>
