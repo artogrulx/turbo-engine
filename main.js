@@ -184,11 +184,28 @@
   }
 
   /** Multiplayer: the server owns the world seed and the edit list, so connect FIRST and build the world from them. */
+  /** Connects to the room. A free Render server may be asleep and refuse the first attempts while it starts, so for
+   *  *.onrender.com the connection is retried for about 90 seconds; real refusals (room full, bad address) are not. */
+  async function connectPatiently(cfg, host, slow) {
+    const deadline = Date.now() + 90000;
+    for (let attempt = 1; ; attempt++) {
+      const net = new OM.Net(cfg);
+      try {
+        return { net, welcome: await net.connect(slow ? 30000 : 25000) };
+      } catch (err) {
+        if (!slow || (err && err.permanent) || Date.now() > deadline) throw err;
+        setLoading(0.1, `Waking up ${host}… a free Render server needs about a minute (try ${attempt + 1})`);
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
+    }
+  }
+
   function connectThenStart(cfg) {
     const srv = OM.Net.normalizeServer(cfg.server);
-    setLoading(0.1, `Connecting to ${srv ? srv.host : cfg.server}…`);
-    const net = new OM.Net(cfg);
-    net.connect().then((welcome) => {
+    const host = srv ? srv.host : cfg.server;
+    const slow = !!srv && OM.Net.isSlowStartHost(srv.host);
+    setLoading(0.1, `Connecting to ${host}…${slow ? ' (a free Render server can take about a minute to wake up)' : ''}`);
+    connectPatiently(cfg, host, slow).then(({ net, welcome }) => {
       try { startWorld(welcome, net); } catch (e) { fatal('The game failed to start', e); }
     }).catch((err) => showError('Could not join the multiplayer room', err && err.message ? err.message : String(err), true));
   }

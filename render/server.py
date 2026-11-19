@@ -23,6 +23,7 @@ import os
 import re
 import signal
 import sys
+import threading
 import time
 import urllib.parse
 from email.utils import formatdate
@@ -77,7 +78,8 @@ class Artifacts:
     def __init__(self, root):
         self.root = root
         self._sig, self._checked = None, 0.0
-        self._html = self._zip = self._index = None
+        self._html, self._zip, self._index = {}, {}, None   # standalone and zip are cached per public address (it is baked into them)
+        self._lock = threading.Lock()                       # the downloads are built in worker threads
 
     def _watched(self):
         r = self.root
@@ -98,27 +100,43 @@ class Artifacts:
             except OSError:
                 pass
         sig = tuple(sig)
-        if sig != self._sig:
-            self._sig = sig
-            self._html = self._zip = self._index = None
+        with self._lock:
+            if sig != self._sig:
+                self._sig = sig
+                self._html.clear()
+                self._zip.clear()
+                self._index = None
 
-    def standalone(self):
-        self.refresh()
-        if self._html is None:
-            self._html = Blob(packager.build_standalone(self.root).encode('utf-8'))
-        return self._html
+    def _per_base(self, cache, base, build):
+        """At most 8 cached variants, one per public address (the address is baked into the files)."""
+        with self._lock:
+            blob = cache.get(base)
+            if blob is None:
+                try:
+                    data = build(base)
+                except ValueError as e:   # e.g. an index.html without the config line: serve it unconfigured rather than fail
+                    print('[artifacts] could not bake in %r: %s' % (base, e), flush=True)
+                    data = build(None)
+                if len(cache) >= 8:
+                    cache.pop(next(iter(cache)))
+                blob = cache[base] = Blob(data)
+            return blob
 
-    def zip(self):
+    def standalone(self, base=None):
+        """The single-file game with `base` (this service's address) as its default multiplayer server."""
         self.refresh()
-        if self._zip is None:
-            self._zip = Blob(packager.build_zip(self.root))
-        return self._zip
+        return self._per_base(self._html, base, lambda b: packager.build_standalone(self.root, b).encode('utf-8'))
+
+    def zip(self, base=None):
+        self.refresh()
+        return self._per_base(self._zip, base, lambda b: packager.build_zip(self.root, b))
 
     def index(self):
         self.refresh()
-        if self._index is None:
-            self._index = Blob(packager.build_offline_index(self.root).encode('utf-8'))
-        return self._index
+        with self._lock:
+            if self._index is None:
+                self._index = Blob(packager.build_offline_index(self.root).encode('utf-8'))
+            return self._index
 
 
 class Context:
@@ -210,11 +228,18 @@ def public_base(ctx, req):
     return '%s://%s' % (proto if proto in ('http', 'https') else 'http', host)
 
 
+def baked_base(ctx, req):
+    """This service's address if it is safe to bake into the downloads, else None."""
+    base = public_base(ctx, req)
+    return base if packager.valid_server(base) else None
+
+
 def landing_page(ctx, req):
     base = public_base(ctx, req)
     wsurl = ('wss' if base.startswith('https') else 'ws') + '://' + base.split('://', 1)[1] + '/ws'
     art = ctx.artifacts
-    h_kb, z_kb = len(art.standalone().data) / 1024, len(art.zip().data) / 1024
+    baked = baked_base(ctx, req)
+    h_kb, z_kb = len(art.standalone(baked).data) / 1024, len(art.zip(baked).data) / 1024
     st = ctx.hub.stats()
     rooms_html = ''.join('<li><b>%s</b> &middot; %d online</li>' % (html.escape(r['name']), r['players']) for r in st['rooms'][:8]) or '<li>No active rooms yet &mdash; join one to create it.</li>'
     page = ('''<!DOCTYPE html>
@@ -282,13 +307,13 @@ async def dispatch(ctx, req, reader, writer):
             body = await loop.run_in_executor(None, lambda: landing_page(ctx, req).encode('utf-8'))
             return await send(ctx, req, writer, 200, body, MIME['.html'], keep=keep)
         if path == '/download/open-meadow.html':
-            blob = await loop.run_in_executor(None, art.standalone)
+            blob = await loop.run_in_executor(None, art.standalone, baked_base(ctx, req))
             return await send(ctx, req, writer, 200, blob.data, MIME['.html'], {'Content-Disposition': 'attachment; filename="open-meadow.html"'}, keep, 'no-cache', True, blob.etag)
         if path == '/download/open-meadow.zip':
-            blob = await loop.run_in_executor(None, art.zip)
+            blob = await loop.run_in_executor(None, art.zip, baked_base(ctx, req))
             return await send(ctx, req, writer, 200, blob.data, MIME['.zip'], {'Content-Disposition': 'attachment; filename="open-meadow.zip"'}, keep, 'no-cache', True, blob.etag)
         if path == '/open-meadow.html':
-            blob = await loop.run_in_executor(None, art.standalone)
+            blob = await loop.run_in_executor(None, art.standalone, baked_base(ctx, req))
             return await send(ctx, req, writer, 200, blob.data, MIME['.html'], keep=keep, etag=blob.etag)
         if path in ('/', '/index.html'):
             blob = await loop.run_in_executor(None, art.index)

@@ -33,18 +33,27 @@
     for (const r of list || []) { const o = document.createElement('option'); o.value = r.name; o.label = r.players + ' online'; dl.appendChild(o); }
   }
 
-  /** Checks the address in the Server field and shows whether an Open Meadow server answers there. */
-  function probe() {
+  /** Checks the address in the Server field and shows whether an Open Meadow server answers there.
+   *  Free Render servers sleep when idle and the request itself wakes them, so for those the check keeps
+   *  retrying (about a minute and a half) with a "waking up" message instead of giving up after one miss. */
+  function probe(attempt) {
+    attempt = typeof attempt === 'number' ? attempt : 0;   // event listeners pass an Event here
     clearTimeout(probeTimer);
     const raw = $('mp-server').value.trim();
     const srv = OM.Net.normalizeServer(raw);
     const seq = ++probeSeq;
-    setLinks(null);
+    if (!attempt) setLinks(null);
     if (!srv) { setStatus(raw ? 'That does not look like a server address.' : 'Enter the address of an Open Meadow server, for example my-game.onrender.com', ''); return; }
-    setStatus('Checking ' + srv.host + '…', '');
+    const wakeMsg = 'Waking up ' + srv.host + '… free Render servers sleep when idle and need about a minute to start.';
+    setStatus(attempt ? wakeMsg : 'Checking ' + srv.host + '…', '');
     OM.Net.probe(srv.http, 7000).then((info) => {
       if (seq !== probeSeq) return;
-      if (!info) { setStatus('No Open Meadow server answered at ' + srv.host + '. Servers on Render\'s free plan need about a minute to wake up — try again.', 'bad'); return; }
+      if (!info && OM.Net.isSlowStartHost(srv.host) && attempt < 14) {
+        setStatus(wakeMsg, '');
+        probeTimer = setTimeout(() => { if (seq === probeSeq) probe(attempt + 1); }, 4000);
+        return;
+      }
+      if (!info) { setStatus('No Open Meadow server answered at ' + srv.host + '. Check the address and that the service is running.', 'bad'); return; }
       const nRooms = typeof info.roomCount === 'number' ? info.roomCount : info.rooms.length;
       setStatus('● Online — ' + info.players + ' player' + (info.players === 1 ? '' : 's') + ' in ' + nRooms + ' room' + (nRooms === 1 ? '' : 's') + ' (up to ' + info.maxPlayers + ' per room)', 'ok');
       fillRooms(info.rooms);

@@ -240,6 +240,14 @@
   <script>window.THREE || document.write('<script src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/script>');</script>
   <!-- three:end -->
 
+  <script>
+    /* The multiplayer server this copy of the game belongs to. Players can always type another address in the
+       Multiplayer dialog (or open the page with ?server=my-game.onrender.com&room=friends).
+       The Render service fills this in when you download the game from it; to set it yourself, edit the line below or run
+       python3 render/packager.py --server https://my-game.onrender.com */
+    window.OPEN_MEADOW_CONFIG = { "server": "" };
+  </script>
+
   <script src="engine/noise.js"></script>
   <script src="engine/blocks.js"></script>
   <script src="engine/textures.js"></script>

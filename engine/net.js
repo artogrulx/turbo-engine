@@ -14,6 +14,8 @@
   const ADJ = ['Brave', 'Calm', 'Clever', 'Gentle', 'Happy', 'Jolly', 'Lucky', 'Merry', 'Quiet', 'Sunny', 'Swift', 'Wild'];
   const NOUN = ['Bee', 'Fox', 'Otter', 'Heron', 'Finch', 'Willow', 'Poppy', 'Badger', 'Hare', 'Wren', 'Moth', 'Newt'];
   const rnd = (n) => Math.floor(Math.random() * n);
+  /** An error that retrying cannot fix (bad address, room full...): main.js only retries the other kind. */
+  const permanent = (msg) => Object.assign(new Error(msg), { permanent: true });
   const store = {
     get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -24,11 +26,19 @@
   // eslint-disable-next-line no-control-regex
   const cleanName = (s) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 16);
 
+  /** The multiplayer server this copy of the game was made for: window.OPEN_MEADOW_CONFIG.server (see index.html). */
+  function defaultServer() {
+    const c = window.OPEN_MEADOW_CONFIG;
+    return c && typeof c.server === 'string' ? c.server.trim() : '';
+  }
+  /** Free Render instances sleep when idle and need about a minute to start again, so be more patient with them. */
+  function isSlowStartHost(host) { return /\.onrender\.com(:\d+)?$/i.test(String(host || '')); }
+
   function loadConfig() {
     let c = {};
     try { c = JSON.parse(store.get(CONFIG_KEY) || '{}') || {}; } catch (e) { c = {}; }
     const cfg = {
-      server: typeof c.server === 'string' ? c.server : '',
+      server: (typeof c.server === 'string' && c.server.trim()) || defaultServer(),   // a server the player chose beats the built-in default
       room: cleanRoom(c.room),
       name: cleanName(c.name) || randomName(),
       color: COLORS.includes(c.color) ? c.color : COLORS[rnd(COLORS.length)],
@@ -93,12 +103,12 @@
      *  (plus `edits: { b, w, p }`) once the server says it is ready. */
     connect(timeoutMs) {
       return new Promise((resolve, reject) => {
-        if (!this.server) { reject(new Error('Enter a server address first.')); return; }
+        if (!this.server) { reject(permanent('Enter a server address first.')); return; }
         if (window.location.protocol === 'https:' && !this.server.secure && !isLocalHost(this.server.host)) {
-          reject(new Error('This page uses https, so browsers only allow secure servers (https:// / wss://).')); return;
+          reject(permanent('This page uses https, so browsers only allow secure servers (https:// / wss://).')); return;
         }
         let ws;
-        try { ws = new WebSocket(this.server.ws); } catch (e) { reject(new Error('Invalid server address.')); return; }
+        try { ws = new WebSocket(this.server.ws); } catch (e) { reject(permanent('Invalid server address.')); return; }
         this.ws = ws;
         const edits = { b: [], w: [], p: [] };
         let welcome = null, settled = false;
@@ -121,7 +131,7 @@
           if (settled) { this._message(m); return; }
           if (m.t === 'welcome') welcome = m;
           else if (m.t === 'edits' && edits[m.k]) { for (let i = 0; i < m.a.length; i++) edits[m.k].push(m.a[i]); }
-          else if (m.t === 'error') fail(new Error(m.msg || 'The server refused the connection.'));
+          else if (m.t === 'error') fail(permanent(m.msg || 'The server refused the connection.'));
           else if (m.t === 'ready' && welcome) {
             settled = true; clearTimeout(timer);
             this._adopt(welcome);
@@ -205,6 +215,8 @@
   Net.normalizeServer = normalizeServer;
   Net.isLocalHost = isLocalHost;
   Net.probe = probe;
+  Net.defaultServer = defaultServer;
+  Net.isSlowStartHost = isSlowStartHost;
   Net.cleanRoom = cleanRoom;
   Net.cleanName = cleanName;
   Net.randomName = randomName;

@@ -13,7 +13,7 @@ A small web service (Python standard library only, no `pip install`) that hosts 
 | `GET /health` | health check for Render |
 | `WS /ws` | multiplayer |
 
-The downloads are generated from the files in the repository whenever one of them changes, so they never go stale.
+The downloads are generated from the files in the repository whenever one of them changes, so they never go stale. Each one also has **this service's own address baked in** as its default multiplayer server (see below).
 
 ## Deploy on Render
 
@@ -31,6 +31,18 @@ The standalone HTML and the GitHub Pages version can join too: type the service 
 python3 render/server.py          # http://localhost:8080
 PORT=9000 python3 render/server.py
 ```
+
+## The standalone HTML and the multiplayer service
+
+The single-file game contains the whole multiplayer client. A copy **downloaded from this service already knows its home server**: open it, choose **Multiplayer**, and the dialog is pre-filled with the service address (checked live, with the download links) — just press **Join**. The same goes for `index.html` and `open-meadow.html` inside the ZIP.
+
+Other copies, such as `open-meadow.html` in the repository or on GitHub Pages, have no default server and ask for one. You can
+
+* type the address into the Multiplayer dialog (it is remembered), or share a link like `…/open-meadow.html?server=my-game.onrender.com&room=friends`;
+* bake your service in with `python3 render/packager.py --server https://my-game.onrender.com`, then commit `open-meadow.html` (later rebuilds keep the address; `--server ""` removes it). You can also edit the `window.OPEN_MEADOW_CONFIG = { "server": "" }` line near the top of the file by hand;
+* rely on the fact that a server the player chose themselves always beats the built-in default.
+
+Free Render instances sleep when idle. For `*.onrender.com` addresses the dialog keeps retrying with a "Waking up…" message and joining waits up to 90 seconds, so the first visit after a quiet period simply takes about a minute. Pages opened from a file send `Origin: null`; if you restrict `ALLOWED_ORIGINS`, include `null` so downloaded copies can still connect.
 
 ## Configuration (environment variables)
 
@@ -68,6 +80,7 @@ Messages are JSON text frames. Client → server: `join {room, name, color}`, `p
 python3 -m unittest discover -s render/tests -v     # WebSocket framing, room rules, packager, the real server over sockets
 python3 render/packager.py                           # rewrites open-meadow.html at the repository root
 python3 render/packager.py --check                   # exits 1 if open-meadow.html is out of date
+python3 render/packager.py --server https://my-game.onrender.com   # bake a default multiplayer server into open-meadow.html
 ```
 
 After changing any game file, run `python3 render/packager.py` so the committed `open-meadow.html` matches (a test fails if it does not).

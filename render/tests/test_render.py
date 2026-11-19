@@ -243,15 +243,55 @@ class Packager(unittest.TestCase):
     def test_committed_standalone_is_up_to_date(self):
         path = packager.find_root() / 'open-meadow.html'
         if path.is_file():
-            self.assertEqual(path.read_bytes(), packager.build_standalone().encode('utf-8'),
+            committed = path.read_text(encoding='utf-8')       # it may have a default server baked in (python3 render/packager.py --server ...)
+            self.assertEqual(committed, packager.build_standalone(server=packager.baked_server(committed)),
                              'open-meadow.html is stale: run python3 render/packager.py')
+
+    def test_default_server_is_baked_in_safely(self):
+        plain = packager.build_standalone()
+        self.assertEqual(packager.baked_server(plain), '')
+        baked = packager.build_standalone(server='https://my-game.onrender.com')
+        self.assertEqual(packager.baked_server(baked), 'https://my-game.onrender.com')
+        self.assertEqual(len(baked) - len(plain), len('https://my-game.onrender.com'))      # nothing but the address changed
+        self.assertEqual(packager.baked_server(packager.with_server(baked, 'http://127.0.0.1:8080')), 'http://127.0.0.1:8080')   # can be re-baked
+        self.assertEqual(packager.baked_server(packager.with_server(baked, '')), '')      # '' removes it
+        self.assertEqual(packager.baked_server(packager.with_server(baked, None)), 'https://my-game.onrender.com')   # None keeps it
+        for bad in ('javascript:alert(1)', 'https://x.com"; alert(1); //', 'https://evil.com/</script>', 'https://a b.com', 'ftp://x.com',
+                    'https://', 'https://x.com/path', 'https://x.com\n'):
+            with self.assertRaises(ValueError, msg=bad):
+                packager.with_server(plain, bad)
+        with self.assertRaises(ValueError):
+            packager.with_server('<html></html>', 'https://x.com')       # a page without the config line is refused, not silently left unconfigured
+
+    def test_zip_carries_the_default_server(self):
+        z = zipfile.ZipFile(io.BytesIO(packager.build_zip(server='https://my-game.onrender.com')))
+        for name in ('open-meadow/open-meadow.html', 'open-meadow/index.html'):
+            self.assertEqual(packager.baked_server(z.read(name).decode()), 'https://my-game.onrender.com', name)
+        self.assertEqual(packager.baked_server(packager.build_offline_index()), '')   # the plain pages stay unconfigured
+
+    def test_cli_keeps_a_baked_server_unless_told_otherwise(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = str(Path(d) / 'game.html')
+            read = lambda: packager.baked_server(Path(out).read_text(encoding='utf-8'))
+            self.assertEqual(packager.main(['--out', out]), 0)
+            self.assertEqual(read(), '')
+            self.assertEqual(packager.main(['--out', out, '--server', 'https://a.example.com']), 0)
+            self.assertEqual(packager.main(['--out', out]), 0)                    # rebuilding keeps the address
+            self.assertEqual(read(), 'https://a.example.com')
+            self.assertEqual(packager.main(['--out', out, '--check']), 0)
+            self.assertEqual(packager.main(['--out', out, '--server', '']), 0)    # explicitly removed
+            self.assertEqual(read(), '')
+            Path(out).write_text('stale', encoding='utf-8')
+            self.assertEqual(packager.main(['--out', out, '--check']), 1)
 
 
 # ------------------------------------------------------------ integration
 async def http_get(port, path, headers=None, method='GET'):
     r, w = await asyncio.open_connection('127.0.0.1', port)
-    extra = ''.join('%s: %s\r\n' % kv for kv in (headers or {}).items())
-    w.write(('%s %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n%s\r\n' % (method, path, port, extra)).encode())
+    headers = dict(headers or {})
+    host = headers.pop('Host', '127.0.0.1:%d' % port)
+    extra = ''.join('%s: %s\r\n' % kv for kv in headers.items())
+    w.write(('%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n' % (method, path, host, extra)).encode())
     raw = await asyncio.wait_for(r.read(), 15)
     w.close()
     await w.wait_closed()
@@ -364,7 +404,7 @@ class ServerIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(st, 200)
         self.assertIn('attachment', h['content-disposition'])
         self.assertIn('open-meadow.html', h['content-disposition'])
-        self.assertEqual(body.decode(), packager.build_standalone())
+        self.assertEqual(body.decode(), packager.build_standalone(server='http://127.0.0.1:%d' % self.port))   # this service's own address is baked in
         # compressed transfer + conditional request
         st, h2, gz = await http_get(self.port, '/download/open-meadow.html', {'Accept-Encoding': 'gzip'})
         self.assertEqual(h2['content-encoding'], 'gzip')
@@ -374,6 +414,32 @@ class ServerIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((st, empty), (304, b''))
         st, h3, _ = await http_get(self.port, '/open-meadow.html')
         self.assertNotIn('content-disposition', h3)      # the inline copy opens in the browser
+
+    async def test_downloads_know_the_services_own_address(self):
+        st, h, body = await http_get(self.port, '/download/open-meadow.html')
+        self.assertEqual(packager.baked_server(body.decode()), 'http://127.0.0.1:%d' % self.port)
+        # behind Render's proxy the public https address comes from the Host / X-Forwarded-Proto headers
+        st, h, body = await http_get(self.port, '/download/open-meadow.html', {'Host': 'my-game.onrender.com', 'X-Forwarded-Proto': 'https'})
+        self.assertEqual(packager.baked_server(body.decode()), 'https://my-game.onrender.com')
+        st, h, body = await http_get(self.port, '/open-meadow.html', {'Host': 'my-game.onrender.com', 'X-Forwarded-Proto': 'javascript'})
+        self.assertEqual(packager.baked_server(body.decode()), 'http://my-game.onrender.com')            # an unknown protocol falls back to http
+        # a hostile Host header can never reach the page: the service falls back to its own local address
+        st, h, body = await http_get(self.port, '/download/open-meadow.html', {'Host': 'evil.com"; alert(1); //'})
+        self.assertNotIn('alert(1)', body.decode())
+        self.assertEqual(packager.baked_server(body.decode()), 'http://localhost:%d' % self.port)
+        # the main game page is not baked: it finds its own server by asking /api/info
+        st, h, body = await http_get(self.port, '/')
+        self.assertEqual(packager.baked_server(body.decode()), '')
+        # an explicit PUBLIC_URL wins over any header, in the HTML and in the ZIP
+        await server.shutdown(self.server, self.ctx)
+        await self.boot(PUBLIC_URL='https://game.example.com/')
+        st, h, body = await http_get(self.port, '/download/open-meadow.html', {'Host': 'other.example.com'})
+        self.assertEqual(packager.baked_server(body.decode()), 'https://game.example.com')
+        z = zipfile.ZipFile(io.BytesIO((await http_get(self.port, '/download/open-meadow.zip'))[2]))
+        for name in ('open-meadow/open-meadow.html', 'open-meadow/index.html'):
+            self.assertEqual(packager.baked_server(z.read(name).decode()), 'https://game.example.com', name)
+        st, h, page = await http_get(self.port, '/download')
+        self.assertIn(b'https://game.example.com', page)
 
     async def test_zip_download(self):
         st, h, body = await http_get(self.port, '/download/open-meadow.zip')
