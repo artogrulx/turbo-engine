@@ -1,231 +1,206 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Block World</title>
-
-    <!-- THREE.JS -->
-    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-
-    <!-- POINTER LOCK -->
-    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open Meadow</title>
+  <meta name="description" content="Open Meadow — a living voxel meadow you can explore, dig and build in, right in the browser.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2379553a'/%3E%3Crect width='16' height='6' rx='2' fill='%2367b43e'/%3E%3Crect y='5' width='16' height='2' fill='%234f8a30'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+  <noscript><div class="noscript">Open Meadow needs JavaScript enabled.</div></noscript>
 
-    <!-- ===================================================
-         GAME
-    ==================================================== -->
+  <!-- 3D view -->
+  <div id="canvas-host"></div>
+  <div id="underwater-overlay"></div>
+  <div id="damage-overlay"></div>
 
-    <div id="game-container"></div>
-
-
-    <!-- ===================================================
-         START SCREEN
-    ==================================================== -->
-
-    <div id="start-screen">
-
-        <div class="start-panel">
-
-            <h1>BLOCK WORLD</h1>
-
-            <p>
-                Click to enter the world
-            </p>
-
-            <button id="play-button">
-                PLAY
-            </button>
-
-            <div class="controls-help">
-
-                <span>WASD — Move</span>
-
-                <span>SPACE — Jump</span>
-
-                <span>LEFT CLICK — Break</span>
-
-                <span>RIGHT CLICK — Place</span>
-
-                <span>E — Inventory</span>
-
-                <span>1–9 / Wheel — Hotbar</span>
-
-            </div>
-
-        </div>
-
+  <!-- In-game HUD (never receives clicks) -->
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="lock-hint" class="hidden">
+      <span id="lock-hint-text">Click the view to capture the mouse</span>
+      <button id="lock-hint-btn" class="btn small" type="button">Capture mouse</button>
     </div>
-
-
-    <!-- ===================================================
-         GAME HUD
-    ==================================================== -->
-
-    <div id="hud">
-
-        <!-- DEBUG -->
-
-        <div id="debug-info">
-
-            <div id="fps-display">
-                FPS: 0
-            </div>
-
-            <div id="coordinate-display">
-                XYZ: 0 / 0 / 0
-            </div>
-
-            <div id="chunk-display">
-                Chunk: 0 / 0
-            </div>
-
-        </div>
-
-
-        <!-- CROSSHAIR -->
-
-        <div id="crosshair">
-
-            <div class="crosshair-horizontal"></div>
-
-            <div class="crosshair-vertical"></div>
-
-        </div>
-
-
-        <!-- BLOCK NAME -->
-
-        <div id="selected-item-name">
-            Grass Block
-        </div>
-
-
-        <!-- HOTBAR -->
-
-        <div id="hotbar"></div>
-
+    <div id="hint">
+      <b>WASD</b> move · <b>Space</b> jump / swim up · <b>Shift</b> sprint · <b>C</b> crouch / dive<br>
+      <b>Left click</b> mine · <b>Right click</b> place · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory · <b>Esc</b> pause
     </div>
-
-
-    <!-- ===================================================
-         INVENTORY
-    ==================================================== -->
-
-    <div id="inventory-overlay">
-
-        <div id="inventory-window">
-
-            <div class="inventory-header">
-
-                <span>
-                    Inventory
-                </span>
-
-                <button id="inventory-close">
-                    ×
-                </button>
-
-            </div>
-
-
-            <!-- PLAYER PREVIEW -->
-
-            <div class="inventory-top">
-
-                <div class="player-preview">
-
-                    <div class="player-head"></div>
-
-                    <div class="player-body"></div>
-
-                    <div class="player-left-arm"></div>
-
-                    <div class="player-right-arm"></div>
-
-                    <div class="player-left-leg"></div>
-
-                    <div class="player-right-leg"></div>
-
-                </div>
-
-
-                <div class="inventory-info">
-
-                    <strong>
-                        Survival Inventory
-                    </strong>
-
-                    <span>
-                        Drag items between slots
-                    </span>
-
-                    <span>
-                        Blocks stack up to 64
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <!-- BACKPACK -->
-
-            <div class="inventory-label">
-                Backpack
-            </div>
-
-            <div id="inventory-grid"></div>
-
-
-            <!-- INVENTORY HOTBAR -->
-
-            <div class="inventory-label hotbar-label">
-                Hotbar
-            </div>
-
-            <div id="inventory-hotbar"></div>
-
-        </div>
-
+    <div id="item-name"></div>
+    <div id="status">
+      <div id="hearts"><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i></div>
+      <div id="bubbles" class="hidden"><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i></div>
     </div>
+    <div id="hotbar"></div>
+    <pre id="debug" class="hidden"></pre>
+  </div>
 
+  <div id="toasts"></div>
 
-    <!-- ===================================================
-         TOOLTIP
-    ==================================================== -->
+  <!-- Inventory -->
+  <div id="inventory-screen" class="screen hidden">
+    <div class="panel inv-panel">
+      <div class="panel-head">
+        <h2>Inventory</h2>
+        <div class="head-actions">
+          <button id="inv-sort" class="btn small" type="button">Sort</button>
+          <button id="inv-close" class="btn small icon" type="button" aria-label="Close inventory">✕</button>
+        </div>
+      </div>
+      <div class="inv-label">Storage</div>
+      <div id="inv-main" class="slot-grid"></div>
+      <div class="inv-label">Hotbar</div>
+      <div id="inv-hotbar" class="slot-grid"></div>
+      <div class="inv-foot">
+        <div class="inv-help">Click to pick up / place · Right-click to split · Shift+click to move · hover + 1–9 to swap · E to close</div>
+        <div id="inv-trash" class="slot trash" title="Delete the held stack"><span class="trash-icon" aria-hidden="true"></span></div>
+      </div>
+    </div>
+    <div id="inv-tooltip"></div>
+    <div id="cursor-stack" class="slot cursor"><img class="slot-icon" alt="" draggable="false"><span class="slot-count"></span></div>
+  </div>
 
-    <div id="item-tooltip"></div>
+  <!-- Loading -->
+  <div id="loading-screen" class="screen">
+    <div class="loading-card">
+      <h1 class="logo">Open <span>Meadow</span></h1>
+      <p class="tagline">Wildflowers, rivers, bees and butterflies — one block at a time.</p>
+      <div class="progress"><div id="loading-bar"></div></div>
+      <p id="loading-text">Starting…</p>
+    </div>
+  </div>
 
+  <!-- Title menu (the live world orbits behind it) -->
+  <div id="menu-screen" class="screen hidden">
+    <div class="menu-card">
+      <h1 class="logo">Open <span>Meadow</span></h1>
+      <p class="tagline">A living voxel meadow to explore, dig and build.</p>
+      <div class="menu-buttons">
+        <button id="btn-start" class="btn primary" type="button">Start Game</button>
+        <button id="btn-new" class="btn" type="button">New World</button>
+        <div class="btn-row">
+          <button id="btn-settings" class="btn" type="button">Settings</button>
+          <button id="btn-controls" class="btn" type="button">Controls</button>
+        </div>
+      </div>
+      <p id="menu-status" class="muted"></p>
+    </div>
+  </div>
 
-    <!-- ===================================================
-         HELD / DRAGGED ITEM
-    ==================================================== -->
+  <!-- Pause -->
+  <div id="pause-screen" class="screen hidden">
+    <div class="menu-card compact">
+      <h2>Paused</h2>
+      <div class="menu-buttons">
+        <button id="btn-resume" class="btn primary" type="button">Resume</button>
+        <div class="btn-row">
+          <button id="btn-pause-settings" class="btn" type="button">Settings</button>
+          <button id="btn-pause-controls" class="btn" type="button">Controls</button>
+        </div>
+        <button id="btn-save" class="btn" type="button">Save World</button>
+        <button id="btn-quit" class="btn" type="button">Save &amp; Quit to Title</button>
+      </div>
+      <p class="muted">Your world also saves automatically every minute.</p>
+    </div>
+  </div>
 
-    <div id="cursor-item"></div>
+  <!-- Death -->
+  <div id="death-screen" class="screen hidden">
+    <div class="menu-card compact death">
+      <h2>You blacked out</h2>
+      <p id="death-reason" class="muted"></p>
+      <div class="menu-buttons"><button id="btn-respawn" class="btn primary" type="button">Respawn</button></div>
+      <p class="muted">You keep your inventory and wake up in the meadow.</p>
+    </div>
+  </div>
 
+  <!-- Settings -->
+  <div id="settings-screen" class="screen hidden">
+    <div class="panel settings-panel">
+      <div class="panel-head"><h2>Settings</h2></div>
+      <div class="settings-grid">
+        <label for="set-render">Render distance</label>
+        <div class="control"><input id="set-render" type="range" min="3" max="12" step="1"><output id="set-render-val"></output></div>
+        <label for="set-shadows">Shadows</label>
+        <div class="control"><select id="set-shadows"><option value="off">Off</option><option value="low">Low</option><option value="high">High</option></select></div>
+        <label for="set-vegetation">Vegetation</label>
+        <div class="control"><select id="set-vegetation"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+        <label for="set-resolution">Resolution</label>
+        <div class="control"><select id="set-resolution"><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option></select></div>
+        <label for="set-leaves">Detailed leaves</label>
+        <div class="control"><input id="set-leaves" type="checkbox"></div>
+        <label for="set-sensitivity">Mouse sensitivity</label>
+        <div class="control"><input id="set-sensitivity" type="range" min="0.2" max="3" step="0.05"><output id="set-sensitivity-val"></output></div>
+        <label for="set-invert">Invert mouse Y</label>
+        <div class="control"><input id="set-invert" type="checkbox"></div>
+        <label for="set-fov">Field of view</label>
+        <div class="control"><input id="set-fov" type="range" min="60" max="100" step="1"><output id="set-fov-val"></output></div>
+        <label for="set-autojump">Auto-jump</label>
+        <div class="control"><input id="set-autojump" type="checkbox"></div>
+        <label for="set-bob">View bobbing</label>
+        <div class="control"><input id="set-bob" type="checkbox"></div>
+        <label for="set-daycycle">Day / night cycle</label>
+        <div class="control"><input id="set-daycycle" type="checkbox"></div>
+        <label for="set-volume">Volume</label>
+        <div class="control"><input id="set-volume" type="range" min="0" max="1" step="0.05"><output id="set-volume-val"></output></div>
+      </div>
+      <p class="muted">World seed: <span id="seed-label"></span></p>
+      <div class="menu-buttons"><button id="btn-settings-back" class="btn primary" type="button">Done</button></div>
+    </div>
+  </div>
 
-    <!-- ===================================================
-         SCRIPTS
-    ==================================================== -->
+  <!-- Controls -->
+  <div id="controls-screen" class="screen hidden">
+    <div class="panel controls-panel">
+      <div class="panel-head"><h2>Controls</h2></div>
+      <div class="controls-grid">
+        <kbd>W A S D</kbd><span>Walk</span>
+        <kbd>Shift</kbd><span>Sprint (or double-tap W)</span>
+        <kbd>Space</kbd><span>Jump · swim up · climb out of water</span>
+        <kbd>C</kbd><span>Crouch (won't walk off edges) · dive</span>
+        <kbd>Mouse</kbd><span>Look around (arrow keys also work)</span>
+        <kbd>Left click</kbd><span>Hold to mine a block, click to pick a flower</span>
+        <kbd>Right click</kbd><span>Place block / flower · use bucket</span>
+        <kbd>Middle click</kbd><span>Pick the block you are looking at</span>
+        <kbd>1 – 9 · Wheel</kbd><span>Choose hotbar slot</span>
+        <kbd>E</kbd><span>Open / close inventory</span>
+        <kbd>Esc</kbd><span>Pause and release the mouse</span>
+        <kbd>F3</kbd><span>Debug information</span>
+      </div>
+      <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill.</p>
+      <div class="menu-buttons"><button id="btn-controls-back" class="btn primary" type="button">Back</button></div>
+    </div>
+  </div>
 
-    <!-- Inventory must load first -->
-    <script src="inventory.js"></script>
+  <!-- Fatal errors -->
+  <div id="error-screen" class="screen hidden">
+    <div class="panel error-panel">
+      <h2 id="error-title">Something went wrong</h2>
+      <pre id="error-text"></pre>
+      <div class="menu-buttons"><button class="btn primary" type="button" onclick="location.reload()">Reload</button></div>
+    </div>
+  </div>
 
-    <!-- World/game loads second -->
-    <script src="main.js"></script>
+  <!-- Three.js r149: the last release with a classic (non-module) build, so the
+       game also runs when index.html is opened directly from disk. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+  <script>window.THREE || document.write('<script src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/script>');</script>
 
+  <script src="engine/noise.js"></script>
+  <script src="engine/blocks.js"></script>
+  <script src="engine/textures.js"></script>
+  <script src="engine/terrain.js"></script>
+  <script src="engine/mesher.js"></script>
+  <script src="engine/world.js"></script>
+  <script src="engine/water.js"></script>
+  <script src="engine/sky.js"></script>
+  <script src="engine/nature.js"></script>
+  <script src="engine/wildlife.js"></script>
+  <script src="engine/player.js"></script>
+  <script src="engine/interaction.js"></script>
+  <script src="engine/audio.js"></script>
+  <script src="inventory.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
