@@ -247,6 +247,59 @@ kbd {
 .error-panel pre { white-space: pre-wrap; font-size: 12px; color: #f6c9c4; max-height: 50vh; overflow: auto; background: rgba(0, 0, 0, 0.35); padding: 12px; border-radius: 10px; }
 .death h2 { color: #ffb4ab; }
 
+/* ------------------------------------------------------------ multiplayer */
+a.btn { text-decoration: none; color: var(--ink); }
+a.btn.primary { color: #0f2410; }
+.btn.disabled { opacity: 0.4; pointer-events: none; }
+input[type="text"] {
+  flex: 1; min-width: 0; padding: 8px 11px; border-radius: 10px; color: var(--ink); font: 14px var(--font);
+  background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line-strong); -webkit-user-select: text; user-select: text;
+}
+input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mp-panel { width: min(600px, 100%); }
+.mp-intro { margin: 0 0 12px; }
+.mp-connected {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 9px 12px;
+  border-radius: 12px; font-size: 13px; background: rgba(143, 209, 107, 0.14); border: 1px solid rgba(143, 209, 107, 0.4);
+}
+.mp-status { min-height: 2.8em; margin: 12px 0 8px; }
+.mp-status.ok { color: #b9ec97; }
+.mp-status.bad { color: #ffb4ab; }
+.mp-help { margin: 12px 0 0; font-size: 12px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); cursor: pointer; transition: transform 0.12s; }
+.swatch:hover { transform: scale(1.12); }
+.swatch.selected { border-color: #fff; transform: scale(1.12); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 10px rgba(255, 255, 255, 0.55); }
+
+#net-badge {
+  position: absolute; right: 14px; top: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border-radius: 999px; font-size: 13px; background: rgba(10, 20, 14, 0.6); border: 1px solid var(--line);
+}
+#net-badge .dot { width: 9px; height: 9px; border-radius: 50%; background: #6cd45a; box-shadow: 0 0 8px #6cd45a; }
+#net-badge.bad .dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+#chat { position: absolute; left: 14px; bottom: calc(var(--slot) + 36px); width: min(46vw, 460px); }
+#chat-log {
+  max-height: 8.6em; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
+  font-size: 14px; line-height: 1.45; text-shadow: 0 1px 3px #000;
+}
+.chat-line { padding: 2px 8px; margin-top: 2px; border-radius: 6px; background: rgba(8, 14, 10, 0.5); animation: chatfade 0.4s ease 11s forwards; word-wrap: break-word; flex: none; }
+.chat-line.sys { color: #c9d8be; font-style: italic; }
+.chat-who { font-weight: 700; }
+@keyframes chatfade { to { opacity: 0; } }
+#chat.open #chat-log { max-height: 16em; overflow-y: auto; }
+#chat.open .chat-line { animation: none; opacity: 1; }
+#chat-form { pointer-events: auto; margin-top: 6px; }
+#chat-form input { width: 100%; background: rgba(8, 14, 10, 0.82); }
+
+#players-list {
+  position: absolute; left: 50%; top: 18%; transform: translateX(-50%); min-width: 240px; padding: 14px 18px;
+  border-radius: 16px; background: rgba(10, 20, 14, 0.78); border: 1px solid var(--line-strong); backdrop-filter: blur(6px);
+}
+.pl-title { margin-bottom: 8px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.pl-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 15px; }
+.pl-row i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+
 /* ---------------------------------------------------------------- toasts */
 #toasts { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; z-index: 40; pointer-events: none; }
 .toast {

@@ -21,6 +21,7 @@
   const $ = (id) => document.getElementById(id);
   const STEP = 1 / 120;
   const SAVE_KEY = 'openmeadow.save.v1', SETTINGS_KEY = 'openmeadow.settings.v1', SEED_KEY = 'openmeadow.newseed';
+  const MP_SAVE = 'openmeadow.mpsave.v1:'; // multiplayer keeps only the inventory locally; the world itself lives on the server
   const DEFAULTS = {
     renderDistance: 6, shadows: 'high', vegetation: 'high', sensitivity: 1, fov: 75,
     invertY: false, autoJump: true, viewBob: true, dayCycle: true, volume: 0.6, resolution: 1, fancyLeaves: true
@@ -39,6 +40,7 @@
     state: 'boot', settings: null, renderer: null, scene: null, camera: null, textures: null, materials: null,
     world: null, water: null, sky: null, nature: null, wildlife: null, player: null, inventory: null, interaction: null, audio: null,
     seed: 0, save: null, spawn: null, startPos: null, started: false, ready: false,
+    mp: null, remote: null, mpCfg: null, mpLostShown: false,
     time: 0, acc: 0, lastT: 0, underwater: 0, lockFailures: 0, lastUnlock: 0, lockHintTimer: 0,
     debug: false, frames: 0, fpsTime: 0, fps: 0, hudTimer: 0, saveTimer: 0, confirmNew: false, pixelScale: 1,
     fog: { near: 50, far: 100, color: null },
@@ -63,16 +65,22 @@
     if (bar) bar.style.width = `${Math.round(p * 100)}%`;
     if (text) { const t = $('loading-text'); if (t) t.textContent = text; }
   }
-  function fatal(title, err) {
-    console.error('[OpenMeadow]', title, err);
+  /** Full-screen message. `mp` adds the "Play single-player instead" button (used for multiplayer problems). */
+  function showError(title, text, mp) {
     show('loading-screen', false);
     show('menu-screen', false);
+    show('mp-screen', false);
     const box = $('error-screen');
-    if (box) {
-      $('error-title').textContent = title;
-      $('error-text').textContent = err ? String(err && err.stack ? err.stack : err) : '';
-      box.classList.remove('hidden');
-    }
+    if (!box) return;
+    $('error-title').textContent = title;
+    $('error-text').textContent = text;
+    show('btn-error-solo', !!mp);
+    $('btn-error-reload').textContent = mp ? 'Try again' : 'Reload';
+    box.classList.remove('hidden');
+  }
+  function fatal(title, err) {
+    console.error('[OpenMeadow]', title, err);
+    showError(title, err ? String(err && err.stack ? err.stack : err) : '', false);
   }
   let lastErrorToast = 0;
   function reportError(err) {
@@ -105,9 +113,11 @@
       fatal('Three.js could not be loaded', 'The 3D library is fetched from a CDN (jsDelivr / unpkg). Check your internet connection and reload the page.');
       return;
     }
-    const missing = ['Noise', 'Blocks', 'Textures', 'TerrainGen', 'Mesher', 'World', 'Water', 'Sky', 'Nature', 'Wildlife', 'Player', 'Interaction', 'AudioFX', 'Inventory']
+    const missing = ['Noise', 'Blocks', 'Textures', 'TerrainGen', 'Mesher', 'World', 'Water', 'Sky', 'Nature', 'Wildlife', 'Player', 'Interaction', 'AudioFX', 'Net', 'RemotePlayers', 'MpUI', 'Inventory']
       .filter((k) => !OM[k]);
     if (missing.length) { fatal('Some game files did not load', `Missing modules: ${missing.join(', ')}. Make sure the engine/ folder sits next to index.html.`); return; }
+    const solo = $('btn-error-solo');
+    if (solo) solo.addEventListener('click', leaveMultiplayer);
     G.settings = loadSettings();
     try { initRenderer(); } catch (e) { fatal('WebGL is not available', e); return; }
     setLoading(0.03, 'Painting textures…');
@@ -167,9 +177,29 @@
   function initGame() {
     G.textures = OM.Textures.build(G.renderer);
     setLoading(0.08, 'Shaping the land…');
-    const save = loadSave();
+    const cfg = OM.Net.loadConfig();
+    G.mpCfg = cfg;
+    if (cfg.auto && cfg.server) connectThenStart(cfg);
+    else startWorld(null, null);
+  }
+
+  /** Multiplayer: the server owns the world seed and the edit list, so connect FIRST and build the world from them. */
+  function connectThenStart(cfg) {
+    const srv = OM.Net.normalizeServer(cfg.server);
+    setLoading(0.1, `Connecting to ${srv ? srv.host : cfg.server}…`);
+    const net = new OM.Net(cfg);
+    net.connect().then((welcome) => {
+      try { startWorld(welcome, net); } catch (e) { fatal('The game failed to start', e); }
+    }).catch((err) => showError('Could not join the multiplayer room', err && err.message ? err.message : String(err), true));
+  }
+
+  function startWorld(welcome, net) {
+    const mp = welcome ? { net, id: welcome.id, room: welcome.room, host: net.server.host } : null;
+    G.mp = mp;
+    const save = mp ? null : loadSave();
     let seed;
-    if (save) seed = save.seed;
+    if (mp) seed = welcome.seed;
+    else if (save) seed = save.seed;
     else {
       const pending = Number(store.get(SEED_KEY));
       seed = Number.isFinite(pending) && pending ? pending : (Math.random() * 2147483646 + 1) | 0;
@@ -186,7 +216,7 @@
     G.water = new OM.Water(G.world);
     G.world.water = G.water;
     G.materials.water = G.water.createMaterial(G.textures);
-    G.sky = new OM.Sky(G.scene, { time: save && typeof save.time === 'number' ? save.time : 0.29 });
+    G.sky = new OM.Sky(G.scene, { time: mp ? net.dayTime() : save && typeof save.time === 'number' ? save.time : 0.29 });
     G.nature = new OM.Nature(G.world, G.scene, G.textures);
     G.world.nature = G.nature;
     G.wildlife = new OM.Wildlife(G.world, G.scene, G.textures);
@@ -202,14 +232,18 @@
     });
     hookPlayer();
 
-    if (save) {
+    if (mp) {
+      setupMultiplayer(welcome, net);
+      const ms = loadMpSave();
+      if (!(ms && ms.seed === seed && G.inventory.deserialize(ms.inventory))) G.inventory.starterKit();
+    } else if (save) {
       try { G.world.deserialize(save.world || {}); } catch (e) { console.warn('[OpenMeadow] world edits could not be restored', e); }
       if (!G.inventory.deserialize(save.inventory)) G.inventory.starterKit();
     } else G.inventory.starterKit();
 
     G.spawn = G.world.gen.findSpawn();
     const sp = save && save.player;
-    G.startPos = sp && isFinite(sp.x) && isFinite(sp.y) && isFinite(sp.z) ? { x: sp.x, y: sp.y, z: sp.z, exact: true } : { x: G.spawn.x, y: G.spawn.y, z: G.spawn.z };
+    G.startPos = sp && isFinite(sp.x) && isFinite(sp.y) && isFinite(sp.z) ? { x: sp.x, y: sp.y, z: sp.z, exact: true } : spawnPoint();
     G.player.yaw = sp && isFinite(sp.yaw) ? sp.yaw : Math.random() * Math.PI * 2;
     G.player.pitch = sp && isFinite(sp.pitch) ? sp.pitch : -0.12;
     if (sp && isFinite(sp.health)) G.player.health = Math.max(1, Math.min(20, sp.health));
@@ -264,7 +298,7 @@
   function respawn() {
     G.player.resetVitals();
     G.interaction.resetMining();
-    placePlayer({ x: G.spawn.x, y: G.spawn.y, z: G.spawn.z });
+    placePlayer(spawnPoint());
     G.player.yaw = Math.random() * Math.PI * 2;
     G.player.pitch = -0.1;
   }
@@ -276,13 +310,18 @@
     show('menu-screen', s === 'menu');
     show('pause-screen', s === 'paused');
     show('death-screen', s === 'dead');
-    show('hud', s === 'playing' || s === 'inventory');
-    if (s !== 'menu' && s !== 'paused') { show('settings-screen', false); show('controls-screen', false); }
+    show('hud', s === 'playing' || s === 'inventory' || s === 'chat');
+    if (s !== 'menu' && s !== 'paused') { show('settings-screen', false); show('controls-screen', false); show('mp-screen', false); }
     document.body.classList.toggle('in-game', s === 'playing');
     if (s !== 'playing') { clearInput(); setLockHint(false); }
     if (s !== 'inventory' && G.inventory && G.inventory.isOpen) G.inventory.close();
+    if (s !== 'chat' && G.mp) OM.MpUI.chatClose();
     if (G.interaction && s !== 'playing') G.interaction.resetMining();
-    if (s === 'menu') $('btn-start').textContent = G.started || G.save ? 'Continue' : 'Start Game';
+    if (s === 'menu') {
+      $('btn-start').textContent = G.started || G.save ? 'Continue' : 'Start Game';
+      show('btn-new', !G.mp);
+      show('btn-leave-mp', !!G.mp);
+    }
     if (s === 'paused' && G.started) saveGame(true);
   }
   function clearInput() {
@@ -412,8 +451,12 @@
           const n = Number(e.code.slice(5)) - 1;
           if (n >= 0 && n < 9) G.inventory.select(n);
         } else if (e.code === 'KeyE' && !e.repeat) openInventory();
+        else if (e.code === 'KeyT' && G.mp && !e.repeat) { e.preventDefault(); openChat(); }
+        else if (e.code === 'Tab' && G.mp) OM.MpUI.showPlayers(true);
         else if (e.code === 'Enter' && !isLocked()) { G.lockFailures = 0; requestLock(); }
         else if (e.code === 'Escape' && !isLocked() && performance.now() - G.lastUnlock > 400) setState('paused');
+      } else if (st === 'chat') {
+        if (e.code === 'Escape') { e.preventDefault(); closeChat(true); }
       } else if (st === 'inventory') {
         if (e.code === 'KeyE' && !e.repeat) { e.preventDefault(); closeInventory(true); }
         else if (e.code === 'Escape') { e.preventDefault(); closeInventory(false); }
@@ -423,8 +466,9 @@
     window.addEventListener('keyup', (e) => {
       G.input.keys.delete(e.code);
       if (e.code === 'KeyW') G.input.sprintLatch = false;
+      if (e.code === 'Tab' && G.mp) OM.MpUI.showPlayers(false);
     });
-    window.addEventListener('blur', () => { clearInput(); if (G.state === 'playing') setState('paused'); });
+    window.addEventListener('blur', () => { clearInput(); if (G.mp) OM.MpUI.showPlayers(false); if (G.state === 'playing') setState('paused'); });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) { if (G.state === 'playing') setState('paused'); if (G.started) saveGame(true); }
     });
@@ -472,6 +516,18 @@
     bindClick('btn-respawn', () => { respawn(); resume(); });
     bindClick('inv-close', () => closeInventory(false));
     bindClick('lock-hint-btn', () => { G.lockFailures = 0; requestLock(); });
+    bindClick('btn-multiplayer', () => {
+      openSub('mp-screen', 'menu-screen');
+      OM.MpUI.fill(G.mpCfg, G.mp ? { host: G.mp.host, room: G.mp.room } : null);
+    });
+    bindClick('btn-leave-mp', leaveMultiplayer);
+    OM.MpUI.setup({
+      onJoin: joinMultiplayer, onLeave: leaveMultiplayer, onBack: () => closeSub('mp-screen'),
+      onChatSend: (text) => { if (G.mp) G.mp.net.sendChat(text); }, onChatClose: (viaEscape) => closeChat(viaEscape)
+    });
+    if (G.mpCfg && G.mpCfg.fromUrl && !G.mp) { // a shared link like ?server=my-game.onrender.com&room=friends opens the dialog
+      G.pendingMpDialog = true;
+    }
 
     // settings form
     const s = G.settings;
@@ -530,7 +586,7 @@
       for (const c of G.world.chunks.values()) if (c.meshed) G.world.urgent.add(c);
     }
     G.player.autoJump = s.autoJump;
-    G.sky.cycle = s.dayCycle;
+    G.sky.cycle = G.mp ? false : s.dayCycle; // in multiplayer the room's shared clock drives the sky
     G.audio.setVolume(s.volume);
     if (!initial) applyResolution();
   }
@@ -548,9 +604,115 @@
     G.pixelScale = (h / 900) * G.renderer.getPixelRatio();
   }
 
+  // ----------------------------------------------------------- multiplayer
+  /** Where this player appears. Everyone starts at the world's spawn meadow; extra players are spread on a small ring. */
+  function spawnPoint() {
+    const s = G.spawn;
+    if (!G.mp) return { x: s.x, y: s.y, z: s.z };
+    const id = G.mp.id, a = id * 2.399963, r = id % 7 === 1 ? 0 : 1.5 + (id % 3) * 0.8;
+    return { x: s.x + Math.cos(a) * r, y: s.y, z: s.z + Math.sin(a) * r };
+  }
+
+  function refreshPlayers() {
+    if (!G.mp) return;
+    const net = G.mp.net;
+    const list = [net.me].concat(Array.from(net.players.values()));
+    OM.MpUI.setPlayers(list, net.id);
+    OM.MpUI.setBadge('ok', `${G.mp.room} · ${list.length} online`);
+    if ($('menu-status') && G.state === 'menu') $('menu-status').textContent = `Connected to ${G.mp.host} · room "${G.mp.room}" · ${list.length} online`;
+  }
+
+  /** A block placed by someone else landed inside us: step up onto it instead of being stuck inside. */
+  function pushOutOfBlock(x, y, z) {
+    const P = G.player;
+    if (!G.started || !P.intersectsBlock(x, y, z)) return;
+    P.pos.y = safeY(P.pos.x, y + 1, P.pos.z);
+    P.vel.set(0, 0, 0);
+    P.prev.copy(P.pos);
+  }
+
+  function setupMultiplayer(welcome, net) {
+    net.me = welcome.you || { id: welcome.id, name: net.cfg.name, color: net.cfg.color };
+    G.world.loadRemoteEdits(welcome.edits);
+    G.remote = new OM.RemotePlayers(G.scene);
+    G.interaction.net = net;
+    G.interaction.remote = G.remote;
+    for (const p of welcome.players) G.remote.add(p);
+    net.onJoin = (p) => { G.remote.add(p); refreshPlayers(); };
+    net.onLeave = (id) => { G.remote.remove(id); refreshPlayers(); };
+    net.onState = (id, x, y, z, yaw, pitch, f) => G.remote.setState(id, x, y, z, yaw, pitch, f);
+    net.onBlock = (x, y, z, v) => { G.world.applyRemoteBlock(x, y, z, v); if (v) pushOutOfBlock(x, y, z); };
+    net.onWater = (x, y, z, v) => G.world.applyRemoteWater(x, y, z, v);
+    net.onPlant = (x, y, z, v) => G.world.applyRemotePlant(x, y, z, v);
+    net.onChat = (m) => { OM.MpUI.chatAdd(m); if (m.id !== net.id) G.audio.play('pop'); };
+    net.onSys = (text) => OM.MpUI.chatAdd({ sys: true, text });
+    net.onClose = mpLost;
+    OM.MpUI.setEnabled(true);
+    refreshPlayers();
+    if (welcome.motd) OM.MpUI.chatAdd({ sys: true, text: welcome.motd });
+    OM.MpUI.chatAdd({ sys: true, text: `Joined room "${welcome.room}" as ${net.me.name}. Press T to chat, hold Tab for the player list.` });
+  }
+
+  function mpLost() {
+    if (G.mpLostShown) return;
+    G.mpLostShown = true;
+    OM.MpUI.setBadge('bad', 'Disconnected');
+    if (isLocked()) document.exitPointerLock();
+    if (G.state === 'playing' || G.state === 'inventory' || G.state === 'chat') setState('paused');
+    showError('Disconnected from the server', 'The connection to the multiplayer server was lost. The shared world is stored on the server, so rejoin to continue.', true);
+  }
+
+  function leaveUrlParams() {
+    try { window.history.replaceState(null, '', window.location.pathname); } catch (e) { /* file:// pages in some browsers */ }
+  }
+  function joinMultiplayer(c) {
+    const cfg = Object.assign({}, G.mpCfg, c, { auto: true });
+    delete cfg.fromUrl;
+    OM.Net.saveConfig(cfg);
+    leaveUrlParams();
+    if (G.started) saveGame(true);   // keep the current world / inventory before the page reloads into the room
+    window.location.reload();
+  }
+  function leaveMultiplayer() {
+    const cfg = OM.Net.loadConfig();
+    cfg.auto = false;
+    delete cfg.fromUrl;
+    OM.Net.saveConfig(cfg);
+    leaveUrlParams();
+    if (G.mp && G.started) saveGame(true);
+    G.started = false;
+    window.location.reload();
+  }
+
+  function openChat() {
+    if (!G.mp || !G.mp.net.connected) return;
+    setState('chat');
+    OM.MpUI.chatOpen();
+    if (isLocked()) document.exitPointerLock();
+  }
+  /** Runs inside the chat box's keydown handler, so requesting the mouse again is allowed (user gesture).
+   *  After Escape the mouse is NOT re-requested: browsers treat Escape as "release the mouse" and would cancel
+   *  the new lock at once, which would look like the user left the game. A click on the view captures it again. */
+  function closeChat(viaEscape) {
+    if (G.state !== 'chat') return;
+    setState('playing');
+    if (viaEscape === true) setLockHint(true);
+    else requestLock();
+  }
+
+  const mpSaveKey = () => MP_SAVE + G.mp.host + '|' + G.mp.room;
+  function loadMpSave() {
+    try { const d = JSON.parse(store.get(mpSaveKey()) || 'null'); return d && d.version === 1 ? d : null; } catch (e) { return null; }
+  }
+
   // ---------------------------------------------------------------- saving
   function saveGame(silent) {
     if (!G.started) return false;
+    if (G.mp) { // the world is on the server: keep only this player's inventory, per server + room
+      const ok = store.set(mpSaveKey(), JSON.stringify({ version: 1, seed: G.seed, savedAt: Date.now(), inventory: G.inventory.serialize() }));
+      if (!silent) toast(ok ? 'Inventory saved (the world lives on the server)' : 'Could not save — browser storage is unavailable or full');
+      return ok;
+    }
     const P = G.player;
     const data = {
       version: 1, seed: G.seed, time: G.sky.time, savedAt: Date.now(),
@@ -593,6 +755,7 @@
         `Wildlife ${wl.butterflies} butterflies, ${wl.bees} bees   flowers nearby ${G.wildlife.flowers.length}\n` +
         `Draw calls ${info.calls}   triangles ${(info.triangles / 1000).toFixed(0)}k\n` +
         `${P.onGround ? 'on ground' : 'airborne'}${P.inWater ? '  in water ' + (P.submerged * 100).toFixed(0) + '%' : ''}${P.headUnder ? '  submerged' : ''}\n` +
+        (G.mp ? `Multiplayer ${G.mp.host} / ${G.mp.room}  ·  ${G.mp.net.players.size + 1} online  ·  ping ${G.mp.net.rtt} ms\n` : '') +
         `Seed ${G.seed}`;
     }
   }
@@ -618,7 +781,9 @@
     if (r.ready >= r.total) {
       G.ready = true;
       setState('menu');
-      $('menu-status').textContent = G.save ? 'Your meadow is waiting where you left it.' : 'A fresh meadow has been generated for you.';
+      $('menu-status').textContent = G.mp ? `Connected to ${G.mp.host} · room "${G.mp.room}" · ${G.mp.net.players.size + 1} online`
+        : G.save ? 'Your meadow is waiting where you left it.' : 'A fresh meadow has been generated for you.';
+      if (G.pendingMpDialog) { G.pendingMpDialog = false; $('btn-multiplayer').click(); }
     }
   }
 
@@ -649,7 +814,7 @@
     if (st === 'loading') { loadingStep(); return; }
     if (st === 'boot') return;
     const P = G.player, cam = G.camera;
-    const simulate = st === 'playing' || st === 'inventory';
+    const simulate = st === 'playing' || st === 'inventory' || st === 'chat';
     G.time += dt;
 
     if (simulate) {
@@ -685,7 +850,12 @@
     G.world.update(center.x, center.z, st === 'menu' ? 10 : 6);
     if (simulate || st === 'menu') {
       G.water.update(dt);
-      if (simulate) G.world.randomTick(P.pos.x, P.pos.z, dt);
+      if (simulate && !G.mp) G.world.randomTick(P.pos.x, P.pos.z, dt); // grass growth is local-only, so it stays off in shared worlds
+    }
+    if (G.mp) {
+      if (G.started) G.mp.net.update(dt, P);   // not before the player has been placed in the world
+      G.remote.update(dt, cam.position);
+      G.sky.time = G.mp.net.dayTime();
     }
 
     const s = G.water.surfaceAt(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z));

@@ -133,6 +133,44 @@
       return true;
     }
 
+    // ------------------------------------------------- multiplayer: remote edits
+    // Edit maps are keyed per chunk, so an edit for a chunk that is not loaded (yet) is simply
+    // remembered here and applied by applyEdits() when that chunk is generated.
+    remember(map, x, y, z, v) {
+      const k = key(x >> 4, z >> 4);
+      let m = map.get(k);
+      if (!m) map.set(k, (m = new Map()));
+      m.set((x & 15) + ((z & 15) << 4) + (y << 8), v);
+      return k;
+    }
+    applyRemoteBlock(x, y, z, id) {
+      if (y < 1 || y >= CY) return false;
+      const c = this.chunks.get(this.remember(this.edits, x, y, z, id));
+      return c && c.generated ? this.setBlock(x, y, z, id, { record: false, cause: 'remote' }) : true;
+    }
+    applyRemoteWater(x, y, z, v) {
+      if (y < 1 || y >= CY) return false;
+      const c = this.chunks.get(this.remember(this.waterEdits, x, y, z, v));
+      if (!c || !c.generated) return true;
+      if (SOLID[c.blocks[(x & 15) + ((z & 15) << 4) + (y << 8)]]) return false;
+      this.setWaterRaw(x, y, z, v);
+      if (v) this.removePlant(x, y, z, 'remote');
+      if (this.water) this.water.scheduleAround(x, y, z);
+      return true;
+    }
+    applyRemotePlant(x, y, z, code) {
+      if (y < 1 || y >= CY) return false;
+      const c = this.chunks.get(this.remember(this.plantEdits, x, y, z, code));
+      if (!c || !c.generated) return true;
+      return code ? this.addPlant(x, y, z, code) : !!this.removePlant(x, y, z, 'remote');
+    }
+    /** Replaces every stored edit with the server's list: { b: [x,y,z,id,...], w: [...], p: [...] }. */
+    loadRemoteEdits(e) {
+      this.edits.clear(); this.waterEdits.clear(); this.plantEdits.clear();
+      const put = (map, a) => { if (a) for (let i = 0; i + 3 < a.length; i += 4) this.remember(map, a[i], a[i + 1], a[i + 2], a[i + 3]); };
+      put(this.edits, e.b); put(this.waterEdits, e.w); put(this.plantEdits, e.p);
+    }
+
     // ------------------------------------------------------------------ edits
     recordEdit(c, i, id) {
       let m = this.edits.get(c.key);
@@ -149,8 +187,9 @@
       c.blocks[i] = id;
       if (SOLID[id] && c.water[i]) this.setWaterRaw(x, y, z, 0);
       if (!opts || opts.record !== false) this.recordEdit(c, i, id);
-      if (id !== 0) this.removePlant(x, y, z, 'replaced');
-      if (!BL.SUPPORTS_PLANT[id]) this.removePlant(x, y + 1, z, 'support');
+      const cause = opts && opts.cause; // 'remote' = caused by another player: plants vanish without dropping items for us
+      if (id !== 0) this.removePlant(x, y, z, cause || 'replaced');
+      if (!BL.SUPPORTS_PLANT[id]) this.removePlant(x, y + 1, z, cause || 'support');
       this.updateColumn(c, lx, lz, y, id);
       this.markDirtyAround(c, lx, lz);
       if (this.water) this.water.scheduleAround(x, y, z);

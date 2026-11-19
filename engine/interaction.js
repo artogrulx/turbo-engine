@@ -16,6 +16,8 @@
       this.world = o.world; this.player = o.player; this.inventory = o.inventory;
       this.scene = o.scene; this.camera = o.camera; this.textures = o.textures;
       this.audio = o.audio || null; this.toast = o.toast || (() => {});
+      this.net = null;     // OM.Net while in a multiplayer room: every player-made change is also sent to the server
+      this.remote = null;  // OM.RemotePlayers: blocks may not be placed inside another player
       this.dir = new THREE.Vector3();
       this.target = null;
       this.mining = false; this.progress = 0; this.mx = 0; this.my = 0; this.mz = 0;
@@ -109,7 +111,7 @@
       if (active && input.mouseLeft && hit && hit.kind !== 'water') {
         if (hit.kind === 'plant') {
           if (this.cooldown <= 0) {
-            W.removePlant(hit.x, hit.y, hit.z, 'player');
+            if (W.removePlant(hit.x, hit.y, hit.z, 'player') && this.net) this.net.sendPlant(hit.x, hit.y, hit.z, 0);
             this.cooldown = 0.2;
             this.swing(false);
             if (this.audio) this.audio.play('break', 'grass');
@@ -150,6 +152,7 @@
     breakBlock(hit) {
       const def = BL.defs[hit.block];
       if (!this.world.setBlock(hit.x, hit.y, hit.z, 0)) return;
+      if (this.net) this.net.sendBlock(hit.x, hit.y, hit.z, 0);
       if (def.drop) this.give(def.drop, 1);
       this.burst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, def.color, 16, 1);
       if (this.audio) this.audio.play('break', def.sound);
@@ -160,6 +163,7 @@
       const W = this.world;
       if (item.kind === 'bucket') {
         if (hit && hit.kind === 'water' && W.setWater(hit.x, hit.y, hit.z, 0)) {
+          if (this.net) this.net.sendWater(hit.x, hit.y, hit.z, 0);
           if (stack.count > 1) { this.inventory.consumeSelected(1); this.give(I.WATER_BUCKET, 1); }
           else this.inventory.setSelected(I.WATER_BUCKET, 1);
           this.swing(false);
@@ -178,19 +182,24 @@
       if (W.getBlock(tx, ty, tz) !== 0) return; // occupied (or not loaded)
       if (item.kind === 'block') {
         if (this.player.intersectsBlock(tx, ty, tz)) return;
+        if (this.remote && this.remote.intersectsBlock(tx, ty, tz)) return; // never wall in another player
         if (W.setBlock(tx, ty, tz, item.block)) {
+          if (this.net) this.net.sendBlock(tx, ty, tz, item.block);
           this.inventory.consumeSelected(1);
           this.swing(false);
           if (this.audio) this.audio.play('place', BL.defs[item.block].sound);
         }
       } else if (item.kind === 'plant') {
-        if (W.addPlant(tx, ty, tz, item.plant | (((Math.random() * 255) | 0) << 8))) {
+        const code = item.plant | (((Math.random() * 255) | 0) << 8);
+        if (W.addPlant(tx, ty, tz, code)) {
+          if (this.net) this.net.sendPlant(tx, ty, tz, code);
           this.inventory.consumeSelected(1);
           this.swing(false);
           if (this.audio) this.audio.play('place', 'grass');
         }
       } else if (item.kind === 'water_bucket') {
         if (W.setWater(tx, ty, tz, OM.Water.SOURCE | OM.Water.FULL)) {
+          if (this.net) this.net.sendWater(tx, ty, tz, OM.Water.SOURCE | OM.Water.FULL);
           this.inventory.setSelected(I.BUCKET, 1);
           this.swing(false);
           if (this.audio) this.audio.play('splash', 'small');

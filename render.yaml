@@ -1,0 +1,24 @@
+# Render Blueprint for Open Meadow (https://render.com/docs/blueprint-spec)
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repository.
+# Deploy from the repository ROOT (do not set a Root Directory): the server serves the game files next to render/.
+services:
+  - type: web
+    name: open-meadow
+    runtime: python
+    plan: free
+    buildCommand: echo "nothing to install - the server only uses the Python standard library"
+    startCommand: python render/server.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MAX_PLAYERS
+        value: "16"
+      - key: MOTD
+        value: Welcome to Open Meadow!
+    # Free instances have no persistent disk, so saved worlds are lost when the instance restarts.
+    # To keep them: use a paid plan, add a disk and set DATA_DIR to its mount path, for example
+    #   disk:
+    #     name: worlds
+    #     mountPath: /var/data
+    #     sizeGB: 1
+    # and add an env var   DATA_DIR = /var/data

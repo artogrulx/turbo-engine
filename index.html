@@ -34,6 +34,16 @@
     </div>
     <div id="hotbar"></div>
     <pre id="debug" class="hidden"></pre>
+
+    <!-- multiplayer -->
+    <div id="net-badge" class="hidden"><i class="dot"></i><span id="net-badge-text"></span></div>
+    <div id="chat" class="hidden">
+      <div id="chat-log"></div>
+      <form id="chat-form" class="hidden" autocomplete="off">
+        <input id="chat-input" type="text" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Say something — Enter to send, Esc to cancel">
+      </form>
+    </div>
+    <div id="players-list" class="hidden"></div>
   </div>
 
   <div id="toasts"></div>
@@ -79,6 +89,8 @@
       <div class="menu-buttons">
         <button id="btn-start" class="btn primary" type="button">Start Game</button>
         <button id="btn-new" class="btn" type="button">New World</button>
+        <button id="btn-multiplayer" class="btn" type="button">Multiplayer</button>
+        <button id="btn-leave-mp" class="btn hidden" type="button">Leave Multiplayer</button>
         <div class="btn-row">
           <button id="btn-settings" class="btn" type="button">Settings</button>
           <button id="btn-controls" class="btn" type="button">Controls</button>
@@ -166,10 +178,44 @@
         <kbd>1 – 9 · Wheel</kbd><span>Choose hotbar slot</span>
         <kbd>E</kbd><span>Open / close inventory</span>
         <kbd>Esc</kbd><span>Pause and release the mouse</span>
+        <kbd>T</kbd><span>Chat (multiplayer)</span>
+        <kbd>Tab</kbd><span>Hold to list the players (multiplayer)</span>
         <kbd>F3</kbd><span>Debug information</span>
       </div>
       <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill.</p>
       <div class="menu-buttons"><button id="btn-controls-back" class="btn primary" type="button">Back</button></div>
+    </div>
+  </div>
+
+  <!-- Multiplayer -->
+  <div id="mp-screen" class="screen hidden">
+    <div class="panel mp-panel">
+      <div class="panel-head"><h2>Multiplayer</h2></div>
+      <p class="muted mp-intro">Everyone in a room shares one world: the blocks, water and flowers you change are seen by all. Your single-player world is never touched.</p>
+      <div id="mp-connected" class="mp-connected hidden">
+        <span id="mp-connected-text"></span>
+        <button id="mp-leave" class="btn small" type="button">Leave</button>
+      </div>
+      <div class="settings-grid">
+        <label for="mp-server">Server</label>
+        <div class="control"><input id="mp-server" type="text" placeholder="my-game.onrender.com" autocomplete="off" spellcheck="false" autocapitalize="off"></div>
+        <label for="mp-room">Room</label>
+        <div class="control"><input id="mp-room" type="text" maxlength="24" list="mp-rooms" autocomplete="off" spellcheck="false" autocapitalize="off"><datalist id="mp-rooms"></datalist></div>
+        <label for="mp-name">Your name</label>
+        <div class="control"><input id="mp-name" type="text" maxlength="16" autocomplete="off" spellcheck="false"></div>
+        <label>Colour</label>
+        <div class="control"><div id="mp-colors" class="swatches"></div></div>
+      </div>
+      <p id="mp-status" class="muted mp-status"></p>
+      <div class="menu-buttons">
+        <button id="mp-join" class="btn primary" type="button">Join</button>
+        <div class="btn-row">
+          <a id="mp-dl-html" class="btn disabled" aria-disabled="true" download>Download HTML</a>
+          <a id="mp-dl-zip" class="btn disabled" aria-disabled="true" download>Download ZIP</a>
+        </div>
+        <button id="mp-back" class="btn" type="button">Back</button>
+      </div>
+      <p class="muted mp-help">The downloads come from the server you entered: <b>HTML</b> is the whole game in a single file, <b>ZIP</b> holds every file plus the server.</p>
     </div>
   </div>
 
@@ -178,14 +224,21 @@
     <div class="panel error-panel">
       <h2 id="error-title">Something went wrong</h2>
       <pre id="error-text"></pre>
-      <div class="menu-buttons"><button class="btn primary" type="button" onclick="location.reload()">Reload</button></div>
+      <div class="menu-buttons">
+        <button id="btn-error-reload" class="btn primary" type="button" onclick="location.reload()">Reload</button>
+        <button id="btn-error-solo" class="btn hidden" type="button">Play single-player instead</button>
+      </div>
     </div>
   </div>
 
+  <!-- three:begin -->
   <!-- Three.js r149: the last release with a classic (non-module) build, so the
-       game also runs when index.html is opened directly from disk. -->
+       game also runs when index.html is opened directly from disk.
+       render/packager.py swaps everything between the three:begin / three:end markers
+       for a local copy (offline index.html) or the inlined library (standalone HTML). -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
   <script>window.THREE || document.write('<script src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/script>');</script>
+  <!-- three:end -->
 
   <script src="engine/noise.js"></script>
   <script src="engine/blocks.js"></script>
@@ -200,6 +253,9 @@
   <script src="engine/player.js"></script>
   <script src="engine/interaction.js"></script>
   <script src="engine/audio.js"></script>
+  <script src="engine/net.js"></script>
+  <script src="engine/remote.js"></script>
+  <script src="engine/mpui.js"></script>
   <script src="inventory.js"></script>
   <script src="main.js"></script>
 </body>
