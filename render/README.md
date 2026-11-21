@@ -79,11 +79,14 @@ Messages are JSON text frames. Client → server: `join {room, name, color}`, `p
 ```bash
 python3 -m unittest discover -s render/tests -v     # WebSocket framing, room rules, packager, the real server over sockets
 python3 render/packager.py                           # rewrites open-meadow.html at the repository root
-python3 render/packager.py --check                   # exits 1 if open-meadow.html is out of date
+python3 render/packager.py --stamp                   # re-stamps the ?v= versions on index.html's scripts and stylesheet
+python3 render/packager.py --check                   # exits 1 if open-meadow.html or the ?v= stamps are out of date
 python3 render/packager.py --server https://my-game.onrender.com   # bake a default multiplayer server into open-meadow.html
 ```
 
-After changing any game file, run `python3 render/packager.py` so the committed `open-meadow.html` matches (a test fails if it does not).
+After changing any game file, run `python3 render/packager.py --stamp` and then `python3 render/packager.py`, so the committed `index.html` and `open-meadow.html` match (a test fails if either does not).
+
+`index.html` names its scripts and stylesheet like `main.js?v=a494574c67`. The version is a hash of the content of all of them, so every deploy asks browsers for fresh files. Without it, GitHub Pages lets browsers reuse cached scripts for ten minutes, and a refresh right after a deploy could pair the new page with old scripts (that is how the crafting screen once came up empty). The packager ignores the `?v=` part when it reads files.
 
 ## Files
 

@@ -101,6 +101,7 @@ engine/
 - **Start-up and mouse capture.** One state machine (`loading → menu → playing ⇄ paused / inventory / dead`) and exactly one `pointerlockchange` listener. Start and Resume enter gameplay first and then request the mouse inside the same click. If the browser refuses the request (for example Chrome's short cooldown after `Esc`), the game keeps running and shows a "click to capture the mouse" hint instead of leaving a dead menu; arrow keys look around in the meantime. Hidden screens use `display: none`, so they can't catch clicks or keyboard focus.
 - **Performance.** Each chunk becomes one mesh per layer (opaque, cutout, water, plants). Meshing copies the chunk and its neighbours into a bordered buffer so the inner loop never branches on chunk edges. Chunk generation, meshing and water rebuilds are time-budgeted per frame, chunks beyond the render distance are unloaded, foliage shares one material with vertex-shader wind and fades smoothly toward the vegetation limit, and the wildlife is two instanced meshes with GPU wing animation.
 - **No modules, no build.** Plain classic scripts sharing one `OM` namespace, loaded in dependency order by `index.html`.
+- **Cache-proof deploys.** The scripts and stylesheet in `index.html` carry a content-hash version (`main.js?v=…`), refreshed with `python3 render/packager.py --stamp`, so a browser can never combine a new page with older cached files. If a file is missing anyway, the error screen says so and suggests a hard refresh.
 
 ## Known limitations
 

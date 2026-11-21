@@ -11,6 +11,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -18,6 +19,7 @@ import unittest
 import warnings
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 warnings.simplefilter('ignore', ResourceWarning)   # the tests deliberately leave some client sockets to the garbage collector
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -240,6 +242,7 @@ class Packager(unittest.TestCase):
             root = Path(d) / 'open-meadow'
             self.assertEqual(packager.build_standalone(root), packager.build_standalone())   # same single-file game, built from the unzipped files
             self.assertIn('vendor/three.min.js', packager.build_offline_index(root))
+            self.assertTrue(packager.stamps_current(root))                     # the zipped page names the same file versions
             again = zipfile.ZipFile(io.BytesIO(packager.build_zip(root)))   # zipping the unzipped copy gives the same file list
             self.assertEqual(sorted(again.namelist()), sorted(zipfile.ZipFile(io.BytesIO(packager.build_zip())).namelist()))
 
@@ -252,6 +255,56 @@ class Packager(unittest.TestCase):
             self.assertIn(need, names)
         self.assertFalse([n for n in names if '__pycache__' in n or '/data/' in n or n.endswith('.pyc')])
         self.assertIn(b'vendor/three.min.js', z.read('open-meadow/index.html'))
+
+    # --- ?v= stamps: a new deploy must never be mixed with scripts a browser cached from the previous one
+    def test_asset_urls_carry_the_current_version_stamp(self):
+        root = packager.find_root()
+        html = (root / 'index.html').read_text(encoding='utf-8')
+        self.assertTrue(packager.stamps_current(root), 'the ?v= stamps in index.html are stale: run python3 render/packager.py --stamp')
+        local = [m for m in packager.STAMP_RE.finditer(packager.THREE_RE.sub('', html)) if not m.group(2).startswith('vendor/')]
+        versions = {m.group(3) for m in local}
+        self.assertEqual(len(versions), 1)                                     # one version for the whole set, so no tag can lag behind
+        self.assertRegex(versions.pop(), r'^[0-9a-f]{10}$')
+        files = packager.asset_files(html)
+        self.assertEqual(files[0], 'style.css')
+        for need in ('main.js', 'inventory.js'):
+            self.assertIn(need, files)
+        self.assertEqual(sorted(f for f in files if f.startswith('engine/')),
+                         sorted('engine/' + p.name for p in (root / 'engine').glob('*.js')))   # every engine file is loaded by the page
+        self.assertNotIn('?', ''.join(packager.local_scripts(html)))           # the packager reads bare file names
+        self.assertIn('cdn.jsdelivr.net', html)                                # the CDN tags are left alone
+        self.assertNotRegex(html, r'jsdelivr[^"]*\?v=')
+
+    def test_the_version_changes_with_any_script_or_style(self):
+        root = packager.find_root()
+        with tempfile.TemporaryDirectory() as d:
+            copy = Path(d) / 'game'
+            copy.mkdir()
+            shutil.copytree(root / 'engine', copy / 'engine')
+            for name in ('index.html', 'style.css', 'main.js', 'inventory.js'):
+                shutil.copy(root / name, copy / name)
+            base = packager.asset_version(copy)
+            self.assertEqual(base, packager.asset_version(root))               # same files, same version
+            seen = {base}
+            for rel in ('engine/world.js', 'style.css', 'main.js', 'inventory.js'):
+                with open(copy / rel, 'a', encoding='utf-8') as f:
+                    f.write('\n// changed\n')
+                v = packager.asset_version(copy)
+                self.assertNotIn(v, seen, rel)
+                seen.add(v)
+            self.assertFalse(packager.stamps_current(copy))                    # the page still carries the old stamps...
+            with mock.patch.dict(os.environ, {'GAME_DIR': str(copy)}):
+                self.assertEqual(packager.main(['--stamp']), 0)                # ...until they are refreshed
+                self.assertEqual(packager.main(['--stamp']), 0)                # idempotent
+            self.assertTrue(packager.stamps_current(copy))
+            stamped = (copy / 'index.html').read_text(encoding='utf-8')
+            self.assertEqual(set(re.findall(r'\?v=([0-9a-f]+)"', packager.THREE_RE.sub('', stamped))), {v})
+            self.assertEqual(packager.asset_files(stamped), packager.asset_files((root / 'index.html').read_text(encoding='utf-8')))
+            unstamped = re.sub(r'\?v=[0-9a-f]+"', '"', stamped)               # the single-file build does not care whether the page is stamped
+            (copy / 'index.html').write_text(unstamped, encoding='utf-8')
+            plain = packager.build_standalone(copy)
+            (copy / 'index.html').write_text(stamped, encoding='utf-8')
+            self.assertEqual(packager.build_standalone(copy), plain)
 
     def test_committed_standalone_is_up_to_date(self):
         path = packager.find_root() / 'open-meadow.html'

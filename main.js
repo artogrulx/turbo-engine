@@ -113,9 +113,12 @@
       fatal('Three.js could not be loaded', 'The 3D library is fetched from a CDN (jsDelivr / unpkg). Check your internet connection and reload the page.');
       return;
     }
-    const missing = ['Noise', 'Blocks', 'Textures', 'TerrainGen', 'Mesher', 'World', 'Water', 'Sky', 'Nature', 'Wildlife', 'Player', 'Interaction', 'AudioFX', 'Net', 'RemotePlayers', 'MpUI', 'Inventory']
+    const missing = ['Noise', 'Blocks', 'Textures', 'TerrainGen', 'Mesher', 'World', 'Water', 'Sky', 'Nature', 'Wildlife', 'Player', 'Interaction', 'AudioFX', 'Net', 'RemotePlayers', 'MpUI', 'Inventory', 'Crafting', 'Furnaces', 'Mobs', 'Realms']
       .filter((k) => !OM[k]);
-    if (missing.length) { fatal('Some game files did not load', `Missing modules: ${missing.join(', ')}. Make sure the engine/ folder sits next to index.html.`); return; }
+    if (missing.length) {
+      fatal('Some game files did not load', `Missing modules: ${missing.join(', ')}. If the game was just updated, your browser may be mixing the new page with older cached files — refresh with Ctrl+Shift+R (Cmd+Shift+R on a Mac). Otherwise make sure the engine/ folder sits next to index.html.`);
+      return;
+    }
     const solo = $('btn-error-solo');
     if (solo) solo.addEventListener('click', leaveMultiplayer);
     G.settings = loadSettings();
