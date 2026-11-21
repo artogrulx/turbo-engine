@@ -16,7 +16,7 @@
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -28,7 +28,8 @@
     AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, GRAVEL: 5, CLAY: 6,
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
-    BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23
+    BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -65,11 +66,15 @@
   def(B.SNOW, 'snow', 'Snowy Grass', { hardness: 0.45, tiles: [T.snow, T.dirt, T.snow_side], sound: 'sand', color: [236, 242, 248] });
   def(B.STONE_BRICKS, 'stone_bricks', 'Stone Bricks', { hardness: 1.5, tiles: [T.stone_bricks, T.stone_bricks, T.stone_bricks], color: [122, 122, 122] });
   def(B.BIRCH_PLANKS, 'birch_planks', 'Birch Planks', { hardness: 0.8, tiles: [T.birch_planks, T.birch_planks, T.birch_planks], sound: 'wood', color: [200, 182, 130] });
+  def(B.CRAFTING_TABLE, 'crafting_table', 'Crafting Table', { hardness: 0.9, tiles: [T.crafting_table_top, T.planks, T.crafting_table_side], sound: 'wood', color: [150, 112, 66] });
+  def(B.FURNACE, 'furnace', 'Furnace', { hardness: 1.6, tiles: [T.furnace_top, T.furnace_top, T.furnace_side], color: [110, 110, 112] });
+  def(B.DIAMOND_ORE, 'diamond_ore', 'Diamond Ore', { hardness: 2.6, tiles: [T.diamond_ore, T.diamond_ore, T.diamond_ore], color: [90, 150, 160] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
   const AO_OCC = new Uint8Array(256), TINT = new Uint8Array(256), SUPPORTS_PLANT = new Uint8Array(256);
   const HARD = new Float32Array(256), TILE = new Int16Array(256 * 6);
+  const TOOL = new Uint8Array(256), LEVEL = new Uint8Array(256);   // preferred tool kind (1 pickaxe, 2 axe, 3 shovel) and the tool tier needed for a drop; filled in by crafting.js
   for (const d of defs) {
     if (!d) continue;
     SOLID[d.id] = d.solid ? 1 : 0;
@@ -85,7 +90,7 @@
   OM.TILES = TILES;
   OM.T = T;
   OM.B = B;
-  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT };
+  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL };
 
   // ---------------------------------------------------------------------------
   // Plants (decorations that live on top of soil blocks; no collision)

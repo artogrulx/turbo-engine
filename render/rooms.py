@@ -28,7 +28,7 @@ DAY_LENGTH = 1440.0            # seconds per in-game day; must match engine/sky.
 START_TIME_OF_DAY = 0.30       # new rooms start in the morning
 COORD_LIMIT = 500_000          # |x|, |z| limit (the client chunk keys stop at +-524,288)
 Y_MIN, Y_MAX = 1, 127
-BLOCK_IDS = frozenset(range(0, 24))   # 0 = air .. 23 = birch planks
+BLOCK_IDS = frozenset(range(0, 64))   # 0 = air; the game reserves ids below 64 for blocks (items and tools use higher ids)
 UNPLACEABLE = frozenset({20})         # bedrock
 WATER_SOURCE = 24                     # SOURCE | FULL in engine/water.js
 PLANT_TYPES = frozenset(range(1, 17))

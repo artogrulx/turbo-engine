@@ -209,8 +209,8 @@ h2 { margin: 0 0 14px; font-size: 24px; }
 .head-actions { display: flex; gap: 8px; }
 .inv-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 10px 0 6px; }
 .slot-grid { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 6px; }
-#inv-main .slot, #inv-hotbar .slot { cursor: pointer; }
-#inv-main .slot:hover, #inv-hotbar .slot:hover, .trash:hover { border-color: var(--sun); background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.12)); }
+#inv-main .slot, #inv-hotbar .slot, .craft-area .slot { cursor: pointer; }
+#inv-main .slot:hover, #inv-hotbar .slot:hover, .craft-area .slot:hover, .trash:hover { border-color: var(--sun); background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.12)); }
 .inv-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
 .inv-help { font-size: 12px; color: var(--muted); max-width: 70%; }
 .trash { cursor: pointer; border-color: rgba(226, 87, 76, 0.5); }
@@ -229,6 +229,55 @@ h2 { margin: 0 0 14px; font-size: 24px; }
   background: none; border: none; box-shadow: none; width: 52px; height: 52px;
 }
 #cursor-stack.show { display: grid; }
+
+/* ------------------------------------------- crafting, furnace, recipe book */
+.inv-wrap { display: flex; align-items: flex-start; justify-content: center; gap: 14px; max-width: 100%; max-height: 100%; overflow: auto; padding: 2px; }
+.inv-wrap > .panel { max-height: calc(100vh - 36px); }
+.craft-area {
+  display: flex; align-items: center; gap: 16px; width: fit-content; margin: 4px 0 2px; padding: 10px 14px;
+  border-radius: 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--line);
+}
+.craft-grid { display: grid; gap: 6px; }
+.craft-arrow {
+  width: 34px; height: 22px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='rgba(255,255,255,0.35)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.result-slot { width: calc(var(--slot) * 1.2); height: calc(var(--slot) * 1.2); border-color: rgba(245, 211, 106, 0.55); }
+.furn-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.flame, .prog { position: relative; flex: none; }
+.flame {
+  width: 26px; height: 30px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 30'%3E%3Cpath d='M13 1C14 8 22 11 22 20 22 26 18 29 13 29 8 29 4 26 4 20 4 15 7 13 8 9 10 11 11 13 11 15 13 11 13 6 13 1Z' fill='rgba(255,255,255,0.18)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.flame i {
+  position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--fill, 0) * 100%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 30'%3E%3Cpath d='M13 1C14 8 22 11 22 20 22 26 18 29 13 29 8 29 4 26 4 20 4 15 7 13 8 9 10 11 11 13 11 15 13 11 13 6 13 1Z' fill='%23ff9a2e'/%3E%3Cpath d='M13 14C16 18 18 20 18 23 18 26 16 27 13 27 10 27 8 26 8 23 8 20 11 18 13 14Z' fill='%23ffe27a'/%3E%3C/svg%3E") left bottom / 26px 30px no-repeat;
+}
+.prog {
+  width: 48px; height: 24px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='rgba(255,255,255,0.18)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.prog i {
+  position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--fill, 0) * 100%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='%23a7ee7a'/%3E%3C/svg%3E") left center / 48px 24px no-repeat;
+}
+.slot-dur { position: absolute; left: 7px; right: 7px; bottom: 4px; height: 4px; border-radius: 2px; background: rgba(0, 0, 0, 0.72); display: none; pointer-events: none; overflow: hidden; }
+.slot-dur i { display: block; height: 100%; }
+.recipe-panel { width: min(390px, 92vw); padding: 18px 18px 16px; }
+.recipe-panel h2 { margin-bottom: 6px; }
+.recipe-panel .muted { margin: 4px 0 6px; line-height: 1.4; }
+.recipe { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.rgrid { display: grid; gap: 2px; flex: none; }
+.rcell {
+  position: relative; width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.rcell.empty { background: rgba(255, 255, 255, 0.025); border-color: rgba(255, 255, 255, 0.05); }
+.rcell img { width: 24px; height: 24px; image-rendering: pixelated; pointer-events: none; }
+.rcount { position: absolute; right: 1px; bottom: -2px; font-size: 11px; font-weight: 700; text-shadow: 1px 1px 0 #000, 0 0 3px #000; pointer-events: none; }
+.rarrow { color: var(--muted); flex: none; }
+.rname { font-size: 13px; line-height: 1.25; min-width: 0; }
+.rfuels { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
 
 /* -------------------------------------------------------------- settings */
 .settings-panel { width: min(560px, 100%); }
@@ -325,6 +374,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   #hint { max-width: calc(100vw - 36px); font-size: 12px; }
   :root { --slot: clamp(32px, 9.4vw, 44px); }
   .slot-grid { gap: 4px; }
+  .inv-wrap { flex-direction: column; align-items: center; }
+  .craft-grid { gap: 4px; }
+  .craft-area { gap: 10px; padding: 8px 10px; }
   #hotbar { gap: 4px; }
   #status { width: calc(var(--slot) * 9 + 4px * 8); }
 }
@@ -348,7 +400,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     </div>
     <div id="hint">
       <b>WASD</b> move · <b>Space</b> jump / swim up · <b>Shift</b> sprint · <b>C</b> crouch / dive<br>
-      <b>Left click</b> mine · <b>Right click</b> place · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory · <b>Esc</b> pause
+      <b>Left click</b> mine · <b>Right click</b> place / use · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory &amp; crafting · <b>Esc</b> pause
     </div>
     <div id="item-name"></div>
     <div id="status">
@@ -371,24 +423,42 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
   <div id="toasts"></div>
 
-  <!-- Inventory -->
+  <!-- Inventory, crafting table and furnace -->
   <div id="inventory-screen" class="screen hidden">
-    <div class="panel inv-panel">
-      <div class="panel-head">
-        <h2>Inventory</h2>
-        <div class="head-actions">
-          <button id="inv-sort" class="btn small" type="button">Sort</button>
-          <button id="inv-close" class="btn small icon" type="button" aria-label="Close inventory">✕</button>
+    <div class="inv-wrap">
+      <div class="panel inv-panel">
+        <div class="panel-head">
+          <h2 id="inv-title">Inventory</h2>
+          <div class="head-actions">
+            <button id="inv-recipes" class="btn small" type="button" aria-pressed="false">Recipes</button>
+            <button id="inv-sort" class="btn small" type="button">Sort</button>
+            <button id="inv-close" class="btn small icon" type="button" aria-label="Close inventory">✕</button>
+          </div>
+        </div>
+        <div id="craft-area" class="craft-area">
+          <div id="craft-grid" class="craft-grid"></div>
+          <div class="craft-arrow" aria-hidden="true"></div>
+          <div id="craft-result" class="slot result-slot" title="Crafting result"></div>
+        </div>
+        <div id="furnace-area" class="craft-area hidden">
+          <div class="furn-col">
+            <div id="furn-in" class="slot" title="Something to smelt"></div>
+            <div id="furn-flame" class="flame" title="Fire"><i></i></div>
+            <div id="furn-fuel" class="slot" title="Fuel"></div>
+          </div>
+          <div id="furn-prog" class="prog" title="Smelting progress"><i></i></div>
+          <div id="furn-out" class="slot result-slot" title="Result"></div>
+        </div>
+        <div class="inv-label">Storage</div>
+        <div id="inv-main" class="slot-grid"></div>
+        <div class="inv-label">Hotbar</div>
+        <div id="inv-hotbar" class="slot-grid"></div>
+        <div class="inv-foot">
+          <div class="inv-help">Click to pick up / place · Right-click to split · Shift+click to move · hover + 1–9 to swap · E to close</div>
+          <div id="inv-trash" class="slot trash" title="Delete the held stack"><span class="trash-icon" aria-hidden="true"></span></div>
         </div>
       </div>
-      <div class="inv-label">Storage</div>
-      <div id="inv-main" class="slot-grid"></div>
-      <div class="inv-label">Hotbar</div>
-      <div id="inv-hotbar" class="slot-grid"></div>
-      <div class="inv-foot">
-        <div class="inv-help">Click to pick up / place · Right-click to split · Shift+click to move · hover + 1–9 to swap · E to close</div>
-        <div id="inv-trash" class="slot trash" title="Delete the held stack"><span class="trash-icon" aria-hidden="true"></span></div>
-      </div>
+      <div id="recipe-panel" class="panel recipe-panel hidden"></div>
     </div>
     <div id="inv-tooltip"></div>
     <div id="cursor-stack" class="slot cursor"><img class="slot-icon" alt="" draggable="false"><span class="slot-count"></span></div>
@@ -496,16 +566,16 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         <kbd>C</kbd><span>Crouch (won't walk off edges) · dive</span>
         <kbd>Mouse</kbd><span>Look around (arrow keys also work)</span>
         <kbd>Left click</kbd><span>Hold to mine a block, click to pick a flower</span>
-        <kbd>Right click</kbd><span>Place block / flower · use bucket</span>
+        <kbd>Right click</kbd><span>Place block / flower · use bucket · open a crafting table or furnace (crouch to build against it)</span>
         <kbd>Middle click</kbd><span>Pick the block you are looking at</span>
         <kbd>1 – 9 · Wheel</kbd><span>Choose hotbar slot</span>
-        <kbd>E</kbd><span>Open / close inventory</span>
+        <kbd>E</kbd><span>Open / close inventory and the 2×2 crafting grid (Recipes button lists every recipe)</span>
         <kbd>Esc</kbd><span>Pause and release the mouse</span>
         <kbd>T</kbd><span>Chat (multiplayer)</span>
         <kbd>Tab</kbd><span>Hold to list the players (multiplayer)</span>
         <kbd>F3</kbd><span>Debug information</span>
       </div>
-      <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill.</p>
+      <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill. Stone needs a pickaxe, iron needs a stone one, diamonds need an iron one.</p>
       <div class="menu-buttons"><button id="btn-controls-back" class="btn primary" type="button">Back</button></div>
     </div>
   </div>
@@ -753,7 +823,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -765,7 +835,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, GRAVEL: 5, CLAY: 6,
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
-    BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23
+    BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -802,11 +873,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   def(B.SNOW, 'snow', 'Snowy Grass', { hardness: 0.45, tiles: [T.snow, T.dirt, T.snow_side], sound: 'sand', color: [236, 242, 248] });
   def(B.STONE_BRICKS, 'stone_bricks', 'Stone Bricks', { hardness: 1.5, tiles: [T.stone_bricks, T.stone_bricks, T.stone_bricks], color: [122, 122, 122] });
   def(B.BIRCH_PLANKS, 'birch_planks', 'Birch Planks', { hardness: 0.8, tiles: [T.birch_planks, T.birch_planks, T.birch_planks], sound: 'wood', color: [200, 182, 130] });
+  def(B.CRAFTING_TABLE, 'crafting_table', 'Crafting Table', { hardness: 0.9, tiles: [T.crafting_table_top, T.planks, T.crafting_table_side], sound: 'wood', color: [150, 112, 66] });
+  def(B.FURNACE, 'furnace', 'Furnace', { hardness: 1.6, tiles: [T.furnace_top, T.furnace_top, T.furnace_side], color: [110, 110, 112] });
+  def(B.DIAMOND_ORE, 'diamond_ore', 'Diamond Ore', { hardness: 2.6, tiles: [T.diamond_ore, T.diamond_ore, T.diamond_ore], color: [90, 150, 160] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
   const AO_OCC = new Uint8Array(256), TINT = new Uint8Array(256), SUPPORTS_PLANT = new Uint8Array(256);
   const HARD = new Float32Array(256), TILE = new Int16Array(256 * 6);
+  const TOOL = new Uint8Array(256), LEVEL = new Uint8Array(256);   // preferred tool kind (1 pickaxe, 2 axe, 3 shovel) and the tool tier needed for a drop; filled in by crafting.js
   for (const d of defs) {
     if (!d) continue;
     SOLID[d.id] = d.solid ? 1 : 0;
@@ -822,7 +897,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   OM.TILES = TILES;
   OM.T = T;
   OM.B = B;
-  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT };
+  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL };
 
   // ---------------------------------------------------------------------------
   // Plants (decorations that live on top of soil blocks; no collision)
@@ -902,6 +977,200 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     get(id) { return itemDefs[id] || null; },
     plantItem(plantId) { return itemDefs[100 + plantId] ? 100 + plantId : 0; }
   };
+})();
+
+</script>
+<script>
+/* Open Meadow — engine/crafting.js
+ * Materials, tool tiers, crafting recipes, tool-aware mining rules and the furnace.
+ * Pure rules and data (no DOM, no Three.js): the screens live in inventory.js and the
+ * world hooks in interaction.js, which makes everything here easy to test on its own.
+ *
+ * Item ids: blocks 1-63 (the block id), plants 101-116, buckets 200-201,
+ *           materials 210-215, tools 300-315 (tier * 4 + kind).                        */
+(function () {
+  'use strict';
+  const OM = window.OM;
+  const B = OM.B, I = OM.I, Items = OM.Items, BL = OM.Blocks;
+
+  // ----------------------------------------------------------------- materials
+  const MATERIALS = [['STICK', 210, 'Stick'], ['COAL', 211, 'Coal'], ['RAW_IRON', 212, 'Raw Iron'],
+    ['IRON_INGOT', 213, 'Iron Ingot'], ['DIAMOND', 214, 'Diamond'], ['FLINT', 215, 'Flint']];
+  for (const [key, id, name] of MATERIALS) {
+    I[key] = id;
+    Items.defs[id] = { id, name, kind: 'material', max: 64, icon: null, material: key.toLowerCase() };
+  }
+
+  // --------------------------------------------------------------------- tools
+  const KINDS = ['pickaxe', 'axe', 'shovel', 'sword'];
+  const KIND_NAME = { pickaxe: 'Pickaxe', axe: 'Axe', shovel: 'Shovel', sword: 'Sword' };
+  const TOOL_CODE = { pickaxe: 1, axe: 2, shovel: 3 };           // matches BL.TOOL
+  // level = what the tier can harvest (BL.LEVEL); speed multiplies mining speed; dur = blocks before it breaks
+  const TIERS = [
+    { key: 'wood', name: 'Wooden', level: 1, speed: 2.0, dur: 48, color: [172, 134, 80] },
+    { key: 'stone', name: 'Stone', level: 2, speed: 3.2, dur: 110, color: [132, 132, 138] },
+    { key: 'iron', name: 'Iron', level: 3, speed: 4.5, dur: 240, color: [218, 220, 226] },
+    { key: 'diamond', name: 'Diamond', level: 4, speed: 6.5, dur: 1100, color: [86, 226, 230] }
+  ];
+  const toolId = (tier, kind) => 300 + tier * 4 + kind;
+  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => {
+    const id = toolId(ti, ki);
+    Items.defs[id] = { id, name: t.name + ' ' + KIND_NAME[k], kind: 'tool', tool: k, tier: t.level, tierIdx: ti, speed: t.speed, dur: t.dur, max: 1, icon: null };
+  }));
+
+  // Which tool a block prefers and which tier it needs before it drops anything.
+  function setTool(ids, kind, level) { for (const id of ids) { BL.TOOL[id] = TOOL_CODE[kind]; BL.LEVEL[id] = level; } }
+  setTool([B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.BRICKS, B.STONE_BRICKS, B.COAL_ORE, B.FURNACE], 'pickaxe', 1);
+  setTool([B.IRON_ORE], 'pickaxe', 2);
+  setTool([B.DIAMOND_ORE], 'pickaxe', 3);
+  setTool([B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG, B.PLANKS, B.BIRCH_PLANKS, B.CRAFTING_TABLE], 'axe', 0);
+  setTool([B.DIRT, B.GRASS, B.SAND, B.GRAVEL, B.CLAY, B.SNOW], 'shovel', 0);
+
+  // Ores drop raw materials; gravel sometimes yields flint.
+  BL.defs[B.COAL_ORE].drop = I.COAL;
+  BL.defs[B.IRON_ORE].drop = I.RAW_IRON;
+  BL.defs[B.DIAMOND_ORE].drop = I.DIAMOND;
+  function dropFor(block, rand) {
+    if (block === B.GRAVEL && (rand === undefined ? Math.random() : rand) < 0.25) return I.FLINT;
+    return BL.defs[block].drop;
+  }
+
+  /** How a held item (0 = bare hand) deals with a block: seconds to break it, and whether it drops anything. */
+  function mining(block, itemId) {
+    const need = BL.LEVEL[block], want = BL.TOOL[block];
+    const it = itemId ? Items.get(itemId) : null;
+    const tool = it && it.kind === 'tool' ? it : null;
+    const matches = !!tool && want !== 0 && TOOL_CODE[tool.tool] === want;
+    const ok = need === 0 || (matches && tool.tier >= need);
+    let speed = matches ? tool.speed : 1;
+    if (!ok) speed *= 0.3;                      // the wrong tool is slow, and yields nothing
+    return { time: BL.HARD[block] / speed, drops: ok, matches };
+  }
+
+  // ------------------------------------------------------------------ recipes
+  // A recipe is shaped (pattern rows + key) or shapeless (list); every ingredient is an item id or a list of
+  // acceptable ids. The 2x2 hand grid and the 3x3 crafting-table grid share one matcher.
+  const G = { planks: [B.PLANKS, B.BIRCH_PLANKS], logs: [B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG], cobble: [B.COBBLE, B.MOSSY_COBBLE] };
+  const recipes = [];
+  const shaped = (rows, key, out, count) => recipes.push({ rows, key, out, count: count || 1, w: Math.max.apply(null, rows.map((r) => r.length)), h: rows.length });
+  const shapeless = (list, out, count) => recipes.push({ list, out, count: count || 1 });
+  const matches = (spec, id) => (Array.isArray(spec) ? spec.indexOf(id) >= 0 : spec === id);
+
+  shapeless([B.OAK_LOG], B.PLANKS, 4);
+  shapeless([B.BIRCH_LOG], B.BIRCH_PLANKS, 4);
+  shapeless([B.SPRUCE_LOG], B.PLANKS, 4);
+  shaped(['P', 'P'], { P: G.planks }, I.STICK, 4);
+  shaped(['PP', 'PP'], { P: G.planks }, B.CRAFTING_TABLE, 1);
+  shaped(['CCC', 'C C', 'CCC'], { C: G.cobble }, B.FURNACE, 1);
+  shaped(['SS', 'SS'], { S: B.STONE }, B.STONE_BRICKS, 4);
+  shaped(['I I', ' I '], { I: I.IRON_INGOT }, I.BUCKET, 1);
+  const HEADS = [G.planks, G.cobble, I.IRON_INGOT, I.DIAMOND];
+  const PATTERN = { pickaxe: ['MMM', ' S ', ' S '], axe: ['MM', 'MS', ' S'], shovel: ['M', 'S', 'S'], sword: ['M', 'M', 'S'] };
+  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => shaped(PATTERN[k], { M: HEADS[ti], S: I.STICK }, toolId(ti, ki), 1)));
+
+  function shapedMatches(r, cells, x0, y0, w, h, mirror) {
+    for (let y = 0; y < h; y++) {
+      const row = r.rows[y];
+      for (let x = 0; x < w; x++) {
+        const ch = row.charAt(mirror ? w - 1 - x : x) || ' ';
+        const cell = cells[(y0 + y) * 3 + (x0 + x)];
+        if (ch === ' ') { if (cell) return false; } else if (!cell || !matches(r.key[ch], cell.id)) return false;
+      }
+    }
+    return true;
+  }
+  /** `cells` = 9 stacks (3x3, row-major, null = empty). Returns the result { id, count } or null. */
+  function find(cells) {
+    const ids = [];
+    let minX = 3, minY = 3, maxX = -1, maxY = -1;
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+      const s = cells[y * 3 + x];
+      if (!s) continue;
+      ids.push(s.id);
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    if (!ids.length) return null;
+    const w = maxX - minX + 1, h = maxY - minY + 1;
+    for (const r of recipes) {
+      if (r.list) {
+        if (r.list.length !== ids.length) continue;
+        const pool = ids.slice();
+        let ok = true;
+        for (const spec of r.list) {
+          const k = pool.findIndex((id) => matches(spec, id));
+          if (k < 0) { ok = false; break; }
+          pool.splice(k, 1);
+        }
+        if (ok) return { id: r.out, count: r.count };
+      } else if (r.w === w && r.h === h) {
+        if (shapedMatches(r, cells, minX, minY, w, h, false) || shapedMatches(r, cells, minX, minY, w, h, true)) return { id: r.out, count: r.count };
+      }
+    }
+    return null;
+  }
+
+  // ----------------------------------------------------------------- smelting
+  const SMELT = new Map([[I.RAW_IRON, I.IRON_INGOT], [B.COBBLE, B.STONE], [B.MOSSY_COBBLE, B.STONE], [B.SAND, B.GLASS], [B.CLAY, B.BRICKS]]);
+  const FUEL = new Map([[I.COAL, 80], [B.OAK_LOG, 15], [B.BIRCH_LOG, 15], [B.SPRUCE_LOG, 15], [B.PLANKS, 15], [B.BIRCH_PLANKS, 15], [B.CRAFTING_TABLE, 15], [I.STICK, 5]]);
+  const SMELT_SECONDS = 8;
+
+  /** One furnace: slots[0] input, slots[1] fuel, slots[2] output. burn = seconds of fire left. */
+  class Furnace {
+    constructor() { this.slots = [null, null, null]; this.burn = 0; this.burnMax = 0; this.prog = 0; }
+    result() { const s = this.slots[0]; return s ? SMELT.get(s.id) : undefined; }
+    canSmelt() {
+      const r = this.result();
+      if (r === undefined) return false;
+      const o = this.slots[2];
+      return !o || (o.id === r && o.count < Items.get(r).max);
+    }
+    update(dt) {
+      const can = this.canSmelt();
+      if (this.burn <= 0 && can) {
+        const f = this.slots[1];
+        if (f && FUEL.has(f.id)) { this.burn = this.burnMax = FUEL.get(f.id); if (--f.count <= 0) this.slots[1] = null; }
+      }
+      if (this.burn > 0) {
+        this.burn = Math.max(0, this.burn - dt);
+        if (can) {
+          this.prog += dt;
+          if (this.prog >= SMELT_SECONDS) {
+            this.prog -= SMELT_SECONDS;
+            const r = this.result(), inp = this.slots[0], out = this.slots[2];
+            if (--inp.count <= 0) this.slots[0] = null;
+            if (out) out.count++; else this.slots[2] = { id: r, count: 1 };
+          }
+        } else this.prog = Math.max(0, this.prog - dt * 2);
+      } else this.prog = Math.max(0, this.prog - dt * 2);
+    }
+    serialize() { return { s: this.slots.map((s) => (s ? [s.id, s.count] : 0)), b: this.burn, m: this.burnMax, p: this.prog }; }
+    static from(d) {
+      const f = new Furnace();
+      if (d && Array.isArray(d.s)) d.s.slice(0, 3).forEach((s, i) => { if (s && Items.get(s[0])) f.slots[i] = { id: s[0], count: Math.max(1, s[1] | 0) }; });
+      f.burn = Math.max(0, +d.b || 0); f.burnMax = Math.max(0, +d.m || 0); f.prog = Math.max(0, +d.p || 0);
+      return f;
+    }
+  }
+
+  /** Every furnace placed in the world, keyed by block position. */
+  const Furnaces = {
+    map: new Map(),
+    key(x, y, z) { return x + ',' + y + ',' + z; },
+    at(x, y, z) { const k = this.key(x, y, z); let f = this.map.get(k); if (!f) this.map.set(k, (f = new Furnace())); return f; },
+    /** Removes a furnace and returns what was inside it. */
+    take(x, y, z) { const k = this.key(x, y, z), f = this.map.get(k); this.map.delete(k); return f ? f.slots.filter(Boolean) : []; },
+    update(dt) { for (const f of this.map.values()) f.update(dt); },
+    clear() { this.map.clear(); },
+    serialize() { return Array.from(this.map.entries()).map(([k, f]) => [k, f.serialize()]); },
+    deserialize(list) {
+      this.map.clear();
+      if (Array.isArray(list)) for (const e of list) if (Array.isArray(e) && typeof e[0] === 'string' && e[1]) this.map.set(e[0], Furnace.from(e[1]));
+    }
+  };
+
+  OM.Crafting = { recipes, find, mining, dropFor, TIERS, KINDS, toolId, GROUP: G, SMELT, FUEL, SMELT_SECONDS, Furnace };
+  OM.Furnaces = Furnaces;
 })();
 
 </script>
@@ -1148,6 +1417,60 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     });
   }
 
+  function pCraftTop(t) {
+    pPlanks(t, [174, 140, 86]);
+    const rim = [96, 70, 42], line = [112, 82, 50];
+    for (let i = 0; i < 32; i++) for (const k of [0, 1, 30, 31]) { t.set(i, k, rim); t.set(k, i, rim); }
+    for (let i = 2; i < 30; i++) for (const k of [10, 21]) { t.set(i, k, line); t.set(k, i, line); }
+    // a few inlaid squares so the grid reads as a work surface
+    for (const [cx, cy, c] of [[5, 5, [196, 70, 58]], [26, 26, [70, 112, 196]], [26, 5, [92, 154, 84]]]) {
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) t.set(cx + x, cy + y, mul(c, 1 - (Math.abs(x) + Math.abs(y)) * 0.04));
+    }
+  }
+  function pCraftSide(t) {
+    pPlanks(t, [166, 132, 82]);
+    const rim = [96, 70, 42];
+    for (let i = 0; i < 32; i++) { t.set(i, 0, rim); t.set(i, 1, rim); t.set(i, 31, mul(rim, 0.85)); t.set(0, i, rim); t.set(31, i, rim); }
+    for (let y = 2; y < 6; y++) for (let x = 1; x < 31; x++) t.set(x, y, mul([150, 116, 70], 0.9 + (y - 2) * 0.03));
+    // a saw (left) and a hammer (right) hanging below the top rail
+    for (let y = 8; y < 25; y++) for (let x = 6; x < 15; x++) t.set(x, y, x === 6 || x === 14 ? [120, 124, 132] : mul([198, 202, 210], 0.92 + ((x + y) % 3) * 0.04));
+    for (let x = 6; x < 15; x += 2) t.set(x, 25, [120, 124, 132]);
+    for (let y = 8; y < 14; y++) for (let x = 7; x < 14; x++) t.set(x, y, [112, 82, 50]);
+    for (let y = 9; y < 27; y++) { t.set(22, y, [120, 88, 52]); t.set(23, y, [146, 110, 68]); }
+    for (let y = 8; y < 14; y++) for (let x = 17; x < 29; x++) t.set(x, y, mul(x > 25 ? [96, 100, 108] : [176, 180, 190], y === 8 ? 1.12 : 1));
+  }
+  function pFurnaceTop(t) {
+    pStone(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [150, 150, 156], 0.35); });
+    for (let i = 0; i < 32; i++) for (const k of [0, 1, 2]) { const c = mul([84, 84, 90], 1 - k * 0.1); t.set(i, k, c); t.set(i, 31 - k, c); t.set(k, i, c); t.set(31 - k, i, c); }
+    for (let y = 9; y < 23; y++) for (let x = 9; x < 23; x++) t.set(x, y, mul([30, 30, 34], 1 + ((x + y) % 4) * 0.05));
+    for (let y = 9; y < 23; y++) { t.set(9, y, [62, 62, 68]); t.set(22, y, [62, 62, 68]); }
+    for (let x = 9; x < 23; x++) { t.set(x, 9, [62, 62, 68]); t.set(x, 22, [62, 62, 68]); }
+  }
+  function pFurnaceSide(t) {
+    pCobble(t, false);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [138, 138, 144], 0.3); });
+    for (let i = 0; i < 32; i++) { t.set(i, 0, [84, 84, 90]); t.set(i, 1, [100, 100, 106]); t.set(0, i, [96, 96, 102]); t.set(31, i, [96, 96, 102]); }
+    for (let y = 14; y < 27; y++) for (let x = 8; x < 24; x++) t.set(x, y, mul([22, 20, 22], 1 + ((x * 3 + y) % 5) * 0.03));
+    for (let x = 6; x < 26; x++) { t.set(x, 12, [66, 66, 72]); t.set(x, 13, [54, 54, 60]); }
+    for (let y = 12; y < 27; y++) { t.set(6, y, [66, 66, 72]); t.set(7, y, [54, 54, 60]); t.set(24, y, [54, 54, 60]); t.set(25, y, [66, 66, 72]); }
+    for (let x = 9; x < 23; x++) {                                                 // embers glowing at the bottom of the mouth
+      const h = 1 + Math.floor((Math.sin(x * 1.7) + 1.3) * 1.6);
+      for (let k = 0; k < h; k++) t.set(x, 26 - k, k === 0 ? [236, 130, 36] : mix([236, 130, 36], [250, 214, 90], k / h));
+    }
+  }
+  function pDiamondOre(t) {
+    pStone(t);
+    const gem = [[1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [1, 3], [2, 3]];
+    for (let i = 0; i < 6; i++) {
+      const cx = 2 + Math.floor(t.r() * 26), cy = 2 + Math.floor(t.r() * 26);
+      for (const [dx, dy] of gem) {
+        const c = dx === 1 && dy === 1 ? [214, 252, 250] : (dx >= 2 && dy >= 2) || dy === 3 ? [36, 158, 172] : [88, 224, 228];
+        t.set(cx + dx, cy + dy, c);
+      }
+    }
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -1173,7 +1496,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     coal_ore: (t) => pOre(t, [[34, 34, 36], [52, 52, 54], [24, 24, 26]]),
     iron_ore: (t) => pOre(t, [[214, 172, 130], [188, 140, 102], [230, 196, 160]]),
     bedrock: pBedrock, snow: pSnow, snow_side: pSnowSide, stone_bricks: pStoneBricks,
-    birch_planks: (t) => pPlanks(t, [206, 186, 134])
+    birch_planks: (t) => pPlanks(t, [206, 186, 134]),
+    crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
+    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre
   };
 
   function buildBlockAtlas() {
@@ -1562,11 +1887,127 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         const col = t % plant.cols, row = Math.floor(t / plant.cols);
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(plant.canvas, col * plant.size, row * plant.size, plant.size, plant.size, 2, 2, S - 4, S - 4);
+      } else if (item.kind === 'tool') {
+        const tier = OM.Crafting ? OM.Crafting.TIERS[item.tierIdx] : null;
+        drawSprite(ctx, toolSprite(item.tool, tier ? tier.color : [180, 180, 180]));
+      } else if (item.kind === 'material') {
+        drawSprite(ctx, materialSprite(item.material));
       } else {
         drawBucket(ctx, item.kind === 'water_bucket');
       }
       item.icon = c.toDataURL();
     }
+  }
+
+  // ---- 16x16 pixel-art sprites for tools and materials (drawn at 4x with an automatic outline)
+  const OUTLINE = [28, 22, 20];
+  class Sprite {
+    constructor() { this.g = new Array(256).fill(null); }
+    p(x, y, c) { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < 16 && y >= 0 && y < 16) this.g[y * 16 + x] = c; }
+    at(x, y) { return x >= 0 && x < 16 && y >= 0 && y < 16 ? this.g[y * 16 + x] : null; }
+    line(x0, y0, x1, y1, c, c2) {                       // c = main colour, c2 = shadow pixel to the right
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + (x1 - x0) * (n ? i / n : 0), y = y0 + (y1 - y0) * (n ? i / n : 0);
+        if (c2) this.p(x + 1, y, c2);
+        this.p(x, y, c);
+      }
+    }
+    poly(pts, c) {                                       // fill by pixel-centre point-in-polygon
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const [xi, yi] = pts[i], [xj, yj] = pts[j];
+          if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+        }
+        if (inside) this.p(x, y, c);
+      }
+    }
+    outline() {
+      const out = this.g.slice();
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        if (this.g[y * 16 + x]) continue;
+        if (this.at(x - 1, y) || this.at(x + 1, y) || this.at(x, y - 1) || this.at(x, y + 1)) out[y * 16 + x] = OUTLINE;
+      }
+      this.g = out;
+    }
+  }
+  function drawSprite(ctx, sp) {
+    sp.outline();
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const c = sp.g[y * 16 + x];
+      if (!c) continue;
+      ctx.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+      ctx.fillRect(x * 4, y * 4, 4, 4);
+    }
+  }
+  const HANDLE = [[172, 128, 72], [118, 82, 46]];
+  function toolSprite(kind, col) {
+    const s = new Sprite();
+    const hi = mix(col, [255, 255, 255], 0.35), lo = mul(col, 0.66);
+    if (kind === 'sword') {
+      s.line(3, 12, 6, 9, HANDLE[0], HANDLE[1]);                           // grip
+      s.line(2, 13, 2, 13, [210, 180, 90]);                                // pommel
+      s.line(4, 8, 8, 12, [150, 120, 70], [104, 82, 50]);                  // cross-guard
+      for (let i = 0; i < 8; i++) { s.p(7 + i, 8 - i, hi); s.p(8 + i, 8 - i, col); s.p(9 + i, 8 - i, lo); }
+      s.p(14, 0, hi); s.p(15, 0, col);
+      return s;
+    }
+    s.line(2, 14, 11, 5, HANDLE[0], HANDLE[1]);                            // shaft
+    if (kind === 'pickaxe') {
+      for (let a = -96; a <= 6; a += 3) {                                  // arc around the shaft's upper end
+        const r = a * Math.PI / 180;
+        for (let d = 6.4; d <= 8.7; d += 0.5) {
+          const x = 5 + Math.cos(r) * d, y = 11 + Math.sin(r) * d;
+          s.p(x, y, d < 7.2 ? lo : d > 8.1 ? hi : col);
+        }
+      }
+    } else if (kind === 'axe') {
+      s.poly([[5.2, 2.4], [10.5, 1.4], [12.5, 4.2], [11.8, 8.6], [9.6, 8.8], [9.2, 6.0], [6.4, 5.2]], col);
+      s.line(5, 3, 10, 2, hi);
+      s.line(6, 6, 9, 6, lo);
+      s.line(10, 8, 12, 5, lo);
+      s.line(11, 5, 11, 5, HANDLE[0]);
+    } else {                                                                // shovel
+      s.poly([[9.2, 1.2], [14.4, 3.6], [14.0, 7.4], [10.6, 8.4], [8.0, 5.0]], col);
+      s.line(10, 2, 13, 4, hi);
+      s.line(13, 5, 12, 7, lo);
+      s.line(9, 6, 11, 7, lo);
+    }
+    return s;
+  }
+  function materialSprite(key) {
+    const s = new Sprite();
+    if (key === 'stick') {
+      s.line(3, 13, 12, 4, HANDLE[0], HANDLE[1]);
+      s.p(12, 3, [196, 156, 96]);
+    } else if (key === 'coal' || key === 'raw_iron') {
+      const base = key === 'coal' ? [48, 48, 54] : [176, 134, 108];
+      const hi = key === 'coal' ? [112, 112, 124] : [222, 184, 148], lo = key === 'coal' ? [22, 22, 26] : [122, 88, 70];
+      s.poly([[3, 7], [5, 3.2], [10, 2.6], [13.2, 6], [12.6, 11.4], [8, 13.4], [4, 11.6]], base);
+      s.poly([[4, 7], [5.6, 4.2], [8.4, 3.8], [6.6, 7.2]], hi);
+      s.poly([[8, 13], [12, 11], [12.4, 8], [9, 9.6]], lo);
+      if (key === 'raw_iron') { s.p(9, 5, [236, 206, 166]); s.p(6, 9, [140, 100, 78]); s.p(10, 8, [226, 190, 150]); s.p(5, 6, [128, 92, 72]); }
+      else { s.p(6, 5, [180, 180, 196]); s.p(9, 7, [78, 78, 90]); }
+    } else if (key === 'iron_ingot') {
+      s.poly([[2, 8], [6, 4.6], [14, 4.6], [10, 8]], [238, 240, 244]);
+      s.poly([[2, 8], [10, 8], [10, 12.4], [2, 12.4]], [196, 200, 210]);
+      s.poly([[10, 8], [14, 4.6], [14, 9], [10, 12.4]], [146, 150, 162]);
+      s.line(3, 9, 9, 9, [226, 230, 238]);
+    } else if (key === 'diamond') {
+      s.poly([[3, 6], [5, 3], [8, 3], [8, 6]], [170, 252, 252]);
+      s.poly([[8, 3], [11, 3], [13, 6], [8, 6]], [100, 228, 236]);
+      s.poly([[3, 6], [8, 6], [8, 13.4]], [54, 194, 210]);
+      s.poly([[8, 6], [13, 6], [8, 13.4]], [32, 148, 176]);
+      s.p(6, 4, [255, 255, 255]); s.p(5, 5, [220, 255, 255]);
+    } else {                                                                // flint
+      s.poly([[4, 10.4], [6.6, 4], [10.4, 5.4], [12.6, 10.6], [8.6, 13.2]], [74, 78, 90]);
+      s.poly([[6.6, 4.4], [9.8, 5.8], [8, 9], [5.6, 9.6]], [124, 130, 146]);
+      s.poly([[8.6, 13], [12.4, 10.6], [10.4, 8], [8, 9.6]], [44, 46, 56]);
+    }
+    return s;
   }
   function drawBucket(ctx, water) {
     ctx.imageSmoothingEnabled = true;
@@ -1803,6 +2244,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     ore(x, y, z) {
       const s = this.seed;
       if (y < 64 && N.hash3(x >> 1, y >> 1, z >> 1, s + 301) < 0.018 && N.hash3(x, y, z, s + 302) < 0.65) return B.COAL_ORE;
+      if (y < 22 && N.hash3(x >> 1, y >> 1, z >> 1, s + 305) < 0.0045 && N.hash3(x, y, z, s + 306) < 0.6) return B.DIAMOND_ORE;   // rare, deep
       if (y < 44 && N.hash3(x >> 1, y >> 1, z >> 1, s + 303) < 0.009 && N.hash3(x, y, z, s + 304) < 0.6) return B.IRON_ORE;
       return B.STONE;
     }
@@ -4428,8 +4870,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 /* Open Meadow — engine/interaction.js
  * Everything the player does to the world with the mouse:
  *   - targeting (voxel ray cast, plants included) with an outline box
- *   - hold-to-mine with hardness-based timing and a crack overlay
- *   - block / flower / water placement with occupancy and body checks
+ *   - hold-to-mine with hardness-based timing (tools, harvest levels and wear: see crafting.js) and a crack overlay
+ *   - block / flower / water placement with occupancy and body checks; crafting tables and furnaces open instead
  *   - break particles and the first-person held-item view with swing     */
 (function () {
   'use strict';
@@ -4445,6 +4887,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.audio = o.audio || null; this.toast = o.toast || (() => {});
       this.net = null;     // OM.Net while in a multiplayer room: every player-made change is also sent to the server
       this.remote = null;  // OM.RemotePlayers: blocks may not be placed inside another player
+      this.onUse = null;   // (blockId, x, y, z) => void — right-clicking a crafting table or furnace
       this.dir = new THREE.Vector3();
       this.target = null;
       this.mining = false; this.progress = 0; this.mx = 0; this.my = 0; this.mz = 0;
@@ -4545,13 +4988,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           }
           this.resetMining();
         } else if (this.cooldown <= 0) {
-          const hard = BL.HARD[hit.block];
-          if (this.mining && this.mx === hit.x && this.my === hit.y && this.mz === hit.z) this.progress += dt / hard;
-          else { this.mining = true; this.mx = hit.x; this.my = hit.y; this.mz = hit.z; this.progress = dt / hard; }
+          const mine = OM.Crafting.mining(hit.block, stack ? stack.id : 0);   // the held tool decides speed and whether anything drops
+          if (this.mining && this.mx === hit.x && this.my === hit.y && this.mz === hit.z) this.progress += dt / mine.time;
+          else { this.mining = true; this.mx = hit.x; this.my = hit.y; this.mz = hit.z; this.progress = dt / mine.time; }
           this.swing(true);
           if (this.audio && Math.random() < dt * 5) this.audio.play('hit', BL.defs[hit.block].sound);
           if (this.progress >= 1) {
-            this.breakBlock(hit);
+            this.breakBlock(hit, mine);
             this.resetMining();
             this.cooldown = 0.14;
           }
@@ -4576,18 +5019,36 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.updateHeld(dt);
     }
 
-    breakBlock(hit) {
+    breakBlock(hit, mine) {
       const def = BL.defs[hit.block];
       if (!this.world.setBlock(hit.x, hit.y, hit.z, 0)) return;
       if (this.net) this.net.sendBlock(hit.x, hit.y, hit.z, 0);
-      if (def.drop) this.give(def.drop, 1);
+      mine = mine || OM.Crafting.mining(hit.block, 0);
+      const drop = mine.drops ? OM.Crafting.dropFor(hit.block) : 0;
+      if (drop) this.give(drop, 1);
+      if (hit.block === OM.B.FURNACE) for (const s of OM.Furnaces.take(hit.x, hit.y, hit.z)) this.give(s.id, s.count);   // its contents are never lost
+      this.wearTool();
       this.burst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, def.color, 16, 1);
       if (this.audio) this.audio.play('break', def.sound);
     }
 
+    /** Breaking a block costs the held tool one use (a sword two); a tool at zero is gone. */
+    wearTool() {
+      const stack = this.inventory.selectedItem(), item = stack ? OM.Items.get(stack.id) : null;
+      if (!item || item.kind !== 'tool') return;
+      if (this.inventory.damageSelected(item.tool === 'sword' ? 2 : 1)) {
+        this.toast('Your ' + item.name + ' broke');
+        if (this.audio) this.audio.play('break', 'stone');
+      }
+    }
+
     place(hit, item, stack) {
-      if (!item) return;
       const W = this.world;
+      if (hit && hit.kind === 'block' && !this.player.sneaking && this.onUse && (hit.block === OM.B.CRAFTING_TABLE || hit.block === OM.B.FURNACE)) {
+        this.onUse(hit.block, hit.x, hit.y, hit.z);     // crouch to build against a table instead
+        return;
+      }
+      if (!item) return;
       if (item.kind === 'bucket') {
         if (hit && hit.kind === 'water' && W.setWater(hit.x, hit.y, hit.z, 0)) {
           if (this.net) this.net.sendWater(hit.x, hit.y, hit.z, 0);
@@ -5484,16 +5945,25 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 </script>
 <script>
 /* Open Meadow — inventory.js
- * Inventory model (9 hotbar + 27 storage slots, stacks up to 64) and its UI:
- *   - hotbar with icons, counts, selection frame and item-name popup
- *   - inventory screen (E): click to pick up / place / swap / merge,
- *     right-click to split or place one, Shift+click to quick-move,
- *     1-9 while hovering to swap with a hotbar slot, trash slot, sort.
+ * Inventory model (9 hotbar + 27 storage slots, stacks up to 64, tools that wear out) and its screens:
+ *   - hotbar with icons, counts, durability bars, selection frame and item-name popup
+ *   - inventory screen (E): click to pick up / place / swap / merge, right-click to split or place one,
+ *     Shift+click to quick-move, 1-9 while hovering to swap with a hotbar slot, trash slot, sort
+ *   - crafting: a 2x2 grid in the inventory and a 3x3 grid at a crafting table, both with a result slot
+ *     (the rules live in engine/crafting.js)
+ *   - furnace screen: input / fuel / output slots with a flame and a progress arrow
+ *   - a recipe book listing every crafting and smelting recipe
  * The inventory never touches pointer lock itself; main.js owns that. */
 (function () {
   'use strict';
   const OM = (window.OM = window.OM || {});
   const HOTBAR = 9, TOTAL = 36;
+  // Where each grid's cells sit inside the 3x3 that the recipe matcher looks at.
+  const GRID_CELLS = { inv: [0, 1, 3, 4], table: [0, 1, 2, 3, 4, 5, 6, 7, 8] };
+  const TITLES = { inv: 'Inventory', table: 'Crafting Table', furnace: 'Furnace' };
+
+  const copy = (s, n) => { const c = { id: s.id, count: n === undefined ? s.count : n }; if (s.dmg) c.dmg = s.dmg; return c; };
+  const encode = (s) => (s ? (s.dmg ? [s.id, s.count, s.dmg] : [s.id, s.count]) : 0);
 
   class Inventory {
     constructor(dom) {
@@ -5502,32 +5972,52 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.selected = 0;
       this.cursor = null;
       this.isOpen = false;
-      this.hovered = -1;
+      this.mode = 'inv';                                     // 'inv' | 'table' | 'furnace'
+      this.grids = { inv: new Array(4).fill(null), table: new Array(9).fill(null) };
+      this.furnace = null;                                   // the OM.Crafting.Furnace shown in furnace mode
+      this.hovered = null;                                   // { area, index } under the pointer
       this.onChange = null;
+      this.notify = null;                                    // (text) => void, set by main.js
       this.nameTimer = 0;
       this.hotbarEls = [];
-      this.slotEls = new Array(TOTAL);
+      this.els = { inv: new Array(TOTAL), craft: [], furn: [], result: null };
+      this.recipesBuilt = false;
       this.buildDOM();
       this.render();
     }
 
     // ------------------------------------------------------------ DOM
-    makeSlot(index, extraClass) {
+    makeSlot(area, index, extraClass) {
       const el = document.createElement('div');
       el.className = 'slot' + (extraClass ? ' ' + extraClass : '');
-      el.dataset.index = String(index);
-      const img = document.createElement('img');
-      img.className = 'slot-icon'; img.alt = ''; img.draggable = false;
-      const cnt = document.createElement('span');
-      cnt.className = 'slot-count';
-      el.appendChild(img); el.appendChild(cnt);
+      el.dataset.area = area; el.dataset.index = String(index);
+      this.decorate(el);
+      return el;
+    }
+    /** Adds the icon / count / durability children every slot needs. */
+    decorate(el) {
+      if (!el.querySelector('.slot-icon')) {
+        const img = document.createElement('img');
+        img.className = 'slot-icon'; img.alt = ''; img.draggable = false;
+        el.appendChild(img);
+      }
+      if (!el.querySelector('.slot-count')) {
+        const cnt = document.createElement('span');
+        cnt.className = 'slot-count';
+        el.appendChild(cnt);
+      }
+      if (!el.querySelector('.slot-dur')) {
+        const dur = document.createElement('div');
+        dur.className = 'slot-dur'; dur.appendChild(document.createElement('i'));
+        el.appendChild(dur);
+      }
       return el;
     }
     buildDOM() {
       const d = this.dom;
       d.hotbar.innerHTML = '';
       for (let i = 0; i < HOTBAR; i++) {
-        const el = this.makeSlot(i, 'hotbar-slot');
+        const el = this.makeSlot('inv', i, 'hotbar-slot');
         const key = document.createElement('span');
         key.className = 'slot-key'; key.textContent = String(i + 1);
         el.appendChild(key);
@@ -5535,39 +6025,62 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         this.hotbarEls.push(el);
       }
       d.main.innerHTML = ''; d.bar.innerHTML = '';
-      for (let i = HOTBAR; i < TOTAL; i++) { const el = this.makeSlot(i); d.main.appendChild(el); this.slotEls[i] = el; }
-      for (let i = 0; i < HOTBAR; i++) { const el = this.makeSlot(i); d.bar.appendChild(el); this.slotEls[i] = el; }
+      for (let i = HOTBAR; i < TOTAL; i++) { const el = this.makeSlot('inv', i); d.main.appendChild(el); this.els.inv[i] = el; }
+      for (let i = 0; i < HOTBAR; i++) { const el = this.makeSlot('inv', i); d.bar.appendChild(el); this.els.inv[i] = el; }
+      this.decorate(d.cursor);
+      if (d.craftResult) { d.craftResult.dataset.area = 'result'; d.craftResult.dataset.index = '0'; this.decorate(d.craftResult); this.els.result = d.craftResult; }
+      [d.furnIn, d.furnFuel, d.furnOut].forEach((el, i) => {
+        if (!el) return;
+        el.dataset.area = 'furn'; el.dataset.index = String(i);
+        this.decorate(el);
+        this.els.furn[i] = el;
+      });
 
-      const onDown = (e) => {
+      d.screen.addEventListener('mousedown', (e) => {
         const el = e.target.closest('.slot');
         if (!el || !this.isOpen) return;
         e.preventDefault();
         if (el === d.trash) { if (this.cursor) { this.cursor = null; this.render(); } return; }
-        const i = Number(el.dataset.index);
-        if (e.button === 0) this.leftClick(i, e.shiftKey);
-        else if (e.button === 2) this.rightClick(i);
-      };
-      d.screen.addEventListener('mousedown', onDown);
+        if (!el.dataset.area) return;
+        this.click(el.dataset.area, Number(el.dataset.index), e.button, e.shiftKey);
+      });
       d.screen.addEventListener('contextmenu', (e) => e.preventDefault());
       d.screen.addEventListener('mousemove', (e) => this.moveCursor(e.clientX, e.clientY));
       d.screen.addEventListener('mouseover', (e) => {
         const el = e.target.closest('.slot');
-        if (!el || el === d.trash) { this.hovered = -1; this.showTooltip(null); return; }
-        this.hovered = Number(el.dataset.index);
-        this.showTooltip(this.slots[this.hovered], el);
+        if (!el || !el.dataset.area) { this.hovered = null; this.showTooltip(null); return; }
+        this.hovered = { area: el.dataset.area, index: Number(el.dataset.index) };
+        this.showTooltip(this.stackAt(this.hovered.area, this.hovered.index), el);
       });
-      d.screen.addEventListener('mouseleave', () => { this.hovered = -1; this.showTooltip(null); });
+      d.screen.addEventListener('mouseleave', () => { this.hovered = null; this.showTooltip(null); });
       if (d.sortBtn) d.sortBtn.addEventListener('click', (e) => { e.preventDefault(); this.sort(); });
+      if (d.recipesBtn) d.recipesBtn.addEventListener('click', (e) => { e.preventDefault(); this.toggleRecipes(); });
+    }
+    buildCraftGrid() {
+      const d = this.dom, n = this.mode === 'table' ? 9 : 4, side = n === 9 ? 3 : 2;
+      d.craftGrid.innerHTML = '';
+      d.craftGrid.style.gridTemplateColumns = `repeat(${side}, var(--slot))`;
+      this.els.craft = [];
+      for (let i = 0; i < n; i++) { const el = this.makeSlot('craft', i); d.craftGrid.appendChild(el); this.els.craft.push(el); }
     }
     moveCursor(x, y) {
       const c = this.dom.cursor;
       c.style.transform = `translate(${x - 26}px, ${y - 26}px)`;
     }
+    elAt(h) {
+      if (!h) return null;
+      if (h.area === 'inv') return this.els.inv[h.index];
+      if (h.area === 'craft') return this.els.craft[h.index];
+      if (h.area === 'furn') return this.els.furn[h.index];
+      return this.els.result;
+    }
     showTooltip(stack, el) {
       const t = this.dom.tooltip;
       if (!stack || !el) { t.classList.remove('show'); return; }
       const def = OM.Items.get(stack.id);
-      t.textContent = def ? def.name : '';
+      let text = def ? def.name : '';
+      if (def && def.dur) text += `  ·  ${def.dur - (stack.dmg || 0)} / ${def.dur} uses left`;
+      t.textContent = text;
       const r = el.getBoundingClientRect();
       t.style.left = `${r.left + r.width / 2}px`;
       t.style.top = `${r.top - 8}px`;
@@ -5575,16 +6088,25 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
     renderSlot(el, stack) {
       if (!el) return;
-      const img = el.querySelector('.slot-icon'), cnt = el.querySelector('.slot-count');
+      const img = el.querySelector('.slot-icon'), cnt = el.querySelector('.slot-count'), dur = el.querySelector('.slot-dur');
       if (stack) {
         const def = OM.Items.get(stack.id);
         if (img.dataset.id !== String(stack.id)) { img.src = def && def.icon ? def.icon : ''; img.dataset.id = String(stack.id); }
         img.style.visibility = 'visible';
         cnt.textContent = stack.count > 1 ? String(stack.count) : '';
+        if (dur) {
+          if (def && def.dur && stack.dmg > 0) {
+            const f = Math.max(0, 1 - stack.dmg / def.dur), bar = dur.firstChild;
+            dur.style.display = 'block';
+            bar.style.width = (f * 100).toFixed(1) + '%';
+            bar.style.background = `hsl(${Math.round(f * 118)}, 78%, 48%)`;
+          } else dur.style.display = 'none';
+        }
       } else {
         img.style.visibility = 'hidden';
         img.dataset.id = '';
         cnt.textContent = '';
+        if (dur) dur.style.display = 'none';
       }
     }
     render() {
@@ -5592,29 +6114,106 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         this.renderSlot(this.hotbarEls[i], this.slots[i]);
         this.hotbarEls[i].classList.toggle('selected', i === this.selected);
       }
-      if (this.isOpen) for (let i = 0; i < TOTAL; i++) this.renderSlot(this.slotEls[i], this.slots[i]);
+      if (this.isOpen) {
+        for (let i = 0; i < TOTAL; i++) this.renderSlot(this.els.inv[i], this.slots[i]);
+        if (this.mode === 'furnace') this.renderFurnace();
+        else {
+          const g = this.grid();
+          for (let i = 0; i < g.length; i++) this.renderSlot(this.els.craft[i], g[i]);
+          this.renderSlot(this.els.result, this.craftResult());
+        }
+      }
       const c = this.dom.cursor;
       if (this.cursor) { this.renderSlot(c, this.cursor); c.classList.add('show'); }
       else c.classList.remove('show');
-      if (this.isOpen && this.hovered >= 0) this.showTooltip(this.slots[this.hovered], this.slotEls[this.hovered]);
+      if (this.isOpen && this.hovered) this.showTooltip(this.stackAt(this.hovered.area, this.hovered.index), this.elAt(this.hovered));
       if (this.onChange) this.onChange();
+    }
+    renderFurnace() {
+      const f = this.furnace;
+      if (!f) return;
+      for (let i = 0; i < 3; i++) this.renderSlot(this.els.furn[i], f.slots[i]);
+      const flame = this.dom.furnFlame, prog = this.dom.furnProg;
+      if (flame) flame.style.setProperty('--fill', f.burn > 0 && f.burnMax > 0 ? Math.min(1, f.burn / f.burnMax).toFixed(3) : '0');
+      if (prog) prog.style.setProperty('--fill', Math.min(1, f.prog / OM.Crafting.SMELT_SECONDS).toFixed(3));
+    }
+    /** Called every frame by main.js: keeps an open furnace screen in step with the fire. */
+    update() { if (this.isOpen && this.mode === 'furnace' && this.furnace) this.renderFurnace(); }
+
+    // ------------------------------------------------------------ crafting model
+    grid() { return this.grids[this.mode === 'table' ? 'table' : 'inv']; }
+    craftResult() {
+      if (this.mode === 'furnace') return null;
+      const cells = new Array(9).fill(null), map = GRID_CELLS[this.mode === 'table' ? 'table' : 'inv'];
+      this.grid().forEach((s, i) => { cells[map[i]] = s; });
+      return OM.Crafting.find(cells);
+    }
+    stackAt(area, i) {
+      if (area === 'inv') return this.slots[i] || null;
+      if (area === 'craft') return this.grid()[i] || null;
+      if (area === 'furn') return this.furnace ? this.furnace.slots[i] || null : null;
+      if (area === 'result') return this.craftResult();
+      return null;
+    }
+    put(area, i, s) {
+      if (area === 'inv') this.slots[i] = s;
+      else if (area === 'craft') this.grid()[i] = s;
+      else if (area === 'furn' && this.furnace) this.furnace.slots[i] = s;
+    }
+    /** Furnace slots only take what belongs there; the output slot only gives. */
+    accepts(area, i, id) {
+      if (area === 'furn') { const C = OM.Crafting; return i === 0 ? C.SMELT.has(id) : i === 1 ? C.FUEL.has(id) : false; }
+      return area !== 'result';
+    }
+    consumeGrid() {
+      const g = this.grid();
+      for (let i = 0; i < g.length; i++) if (g[i] && --g[i].count <= 0) g[i] = null;
+    }
+    /** Takes one result out of the grid: onto the cursor, or (shift) straight into the bag. */
+    craftOne(toCursor) {
+      const r = this.craftResult();
+      if (!r) return false;
+      const max = this.maxOf(r.id);
+      if (toCursor) {
+        const c = this.cursor;
+        if (c) { if (c.id !== r.id || max <= 1 || c.count + r.count > max) return false; c.count += r.count; }
+        else this.cursor = { id: r.id, count: r.count };
+      } else {
+        if (this.roomFor(r.id) < r.count) return false;
+        this.addQuiet(r.id, r.count);
+      }
+      this.consumeGrid();
+      return true;
+    }
+    clickResult(shift) {
+      if (!this.craftResult()) return;
+      if (shift) { let guard = 0; while (guard++ < 700 && this.craftOne(false)) { /* craft until the ingredients or the room run out */ } }
+      else this.craftOne(true);
+      this.render();
     }
 
     // ------------------------------------------------------------ model
     maxOf(id) { const d = OM.Items.get(id); return d ? d.max : 64; }
-    add(id, n) {
+    roomFor(id) {
+      const max = this.maxOf(id);
+      let room = 0;
+      for (const s of this.slots) room += !s ? max : s.id === id && !s.dmg ? Math.max(0, max - s.count) : 0;
+      return room;
+    }
+    addQuiet(id, n) {
       if (!OM.Items.get(id) || n <= 0) return n;
       const max = this.maxOf(id);
       for (let i = 0; i < TOTAL && n > 0; i++) {
         const s = this.slots[i];
-        if (s && s.id === id && s.count < max) { const k = Math.min(n, max - s.count); s.count += k; n -= k; }
+        if (s && s.id === id && !s.dmg && s.count < max) { const k = Math.min(n, max - s.count); s.count += k; n -= k; }
       }
       for (let i = 0; i < TOTAL && n > 0; i++) {
         if (!this.slots[i]) { const k = Math.min(n, max); this.slots[i] = { id, count: k }; n -= k; }
       }
-      this.render();
       return n;
     }
+    /** Adds items to the bag; returns how many did not fit. */
+    add(id, n) { const left = this.addQuiet(id, n); this.render(); return left; }
     count(id) { let n = 0; for (const s of this.slots) if (s && s.id === id) n += s.count; return n; }
     selectedItem() { return this.slots[this.selected]; }
     consumeSelected(n) {
@@ -5625,6 +6224,16 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.render();
     }
     setSelected(id, count) { this.slots[this.selected] = id ? { id, count } : null; this.render(); }
+    /** Wears the selected tool; returns true when it broke (and is gone). */
+    damageSelected(n) {
+      const s = this.slots[this.selected], def = s ? OM.Items.get(s.id) : null;
+      if (!def || !def.dur) return false;
+      s.dmg = (s.dmg || 0) + n;
+      const broke = s.dmg >= def.dur;
+      if (broke) this.slots[this.selected] = null;
+      this.render();
+      return broke;
+    }
     select(i) {
       i = ((i % HOTBAR) + HOTBAR) % HOTBAR;
       if (i === this.selected) return;
@@ -5658,30 +6267,43 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
 
     // ------------------------------------------------------------ clicks
-    leftClick(i, shift) {
-      const s = this.slots[i];
-      if (shift && s) { this.quickMove(i); return; }
-      const c = this.cursor;
-      if (!c && s) { this.cursor = s; this.slots[i] = null; }
-      else if (c && !s) { this.slots[i] = c; this.cursor = null; }
+    click(area, i, button, shift) {
+      if (area === 'result') { if (button === 0 || button === 2) this.clickResult(shift); return; }
+      if (button === 0) this.leftClick(area, i, shift);
+      else if (button === 2) this.rightClick(area, i);
+    }
+    leftClick(area, i, shift) {
+      const s = this.stackAt(area, i), c = this.cursor;
+      if (shift) { if (s) this.quickMove(area, i); return; }
+      if (area === 'furn' && i === 2) {                      // the furnace output only gives
+        if (s && !c) { this.cursor = s; this.put(area, i, null); }
+        else if (s && c && c.id === s.id && this.maxOf(c.id) > 1 && c.count + s.count <= this.maxOf(c.id)) { c.count += s.count; this.put(area, i, null); }
+        this.render();
+        return;
+      }
+      if (!c && s) { this.cursor = s; this.put(area, i, null); }
+      else if (c && !s) { if (!this.accepts(area, i, c.id)) return; this.put(area, i, c); this.cursor = null; }
       else if (c && s) {
-        if (c.id === s.id) {
+        if (!this.accepts(area, i, c.id)) return;
+        if (c.id === s.id && this.maxOf(s.id) > 1) {
           const k = Math.min(c.count, this.maxOf(s.id) - s.count);
           s.count += k; c.count -= k;
           if (c.count <= 0) this.cursor = null;
-        } else { this.slots[i] = c; this.cursor = s; }
+        } else { this.put(area, i, c); this.cursor = s; }
       }
       this.render();
     }
-    rightClick(i) {
-      const s = this.slots[i], c = this.cursor;
+    rightClick(area, i) {
+      if (area === 'furn' && i === 2) { this.leftClick(area, i, false); return; }
+      const s = this.stackAt(area, i), c = this.cursor;
       if (!c && s) {
         const k = Math.ceil(s.count / 2);
-        this.cursor = { id: s.id, count: k };
+        this.cursor = copy(s, k);
         s.count -= k;
-        if (s.count <= 0) this.slots[i] = null;
+        if (s.count <= 0) this.put(area, i, null);
       } else if (c && !s) {
-        this.slots[i] = { id: c.id, count: 1 };
+        if (!this.accepts(area, i, c.id)) return;
+        this.put(area, i, copy(c, 1));
         if (--c.count <= 0) this.cursor = null;
       } else if (c && s && c.id === s.id && s.count < this.maxOf(s.id)) {
         s.count++;
@@ -5693,34 +6315,63 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const max = this.maxOf(stack.id);
       for (let i = from; i < to && stack.count > 0; i++) {
         const s = this.slots[i];
-        if (s && s.id === stack.id && s.count < max) { const k = Math.min(stack.count, max - s.count); s.count += k; stack.count -= k; }
+        if (s && s.id === stack.id && !s.dmg && !stack.dmg && s.count < max) { const k = Math.min(stack.count, max - s.count); s.count += k; stack.count -= k; }
       }
       for (let i = from; i < to && stack.count > 0; i++) {
-        if (!this.slots[i]) { this.slots[i] = { id: stack.id, count: stack.count }; stack.count = 0; }
+        if (!this.slots[i]) { this.slots[i] = copy(stack); stack.count = 0; }
       }
     }
-    quickMove(i) {
-      const s = this.slots[i];
-      this.slots[i] = null;
-      if (i < HOTBAR) this.moveInto(s, HOTBAR, TOTAL); else this.moveInto(s, 0, HOTBAR);
-      if (s.count > 0) {
-        // nowhere to go: put the remainder back where it came from
-        if (!this.slots[i]) this.slots[i] = s; else this.moveInto(s, 0, TOTAL);
+    /** Moves a furnace-bound item (something to smelt, or fuel) from the bag into the open furnace. */
+    toFurnace(i) {
+      const s = this.slots[i], C = OM.Crafting, f = this.furnace;
+      if (!s || !f) return false;
+      const target = C.SMELT.has(s.id) ? 0 : C.FUEL.has(s.id) ? 1 : -1;
+      if (target < 0) return false;
+      const dst = f.slots[target];
+      if (!dst) { f.slots[target] = s; this.slots[i] = null; }
+      else if (dst.id === s.id) {
+        const k = Math.min(s.count, this.maxOf(s.id) - dst.count);
+        if (k > 0) { dst.count += k; s.count -= k; if (s.count <= 0) this.slots[i] = null; }
+      } else return false;
+      this.render();
+      return true;
+    }
+    quickMove(area, i) {
+      const s = this.stackAt(area, i);
+      if (!s) return;
+      if (area === 'inv') {
+        if (this.mode === 'furnace' && this.toFurnace(i)) return;
+        this.slots[i] = null;
+        if (i < HOTBAR) this.moveInto(s, HOTBAR, TOTAL); else this.moveInto(s, 0, HOTBAR);
+        if (s.count > 0) {
+          // nowhere to go: put the remainder back where it came from
+          if (!this.slots[i]) this.slots[i] = s; else this.moveInto(s, 0, TOTAL);
+        }
+      } else {
+        this.put(area, i, null);                             // crafting grid / furnace -> bag
+        this.moveInto(s, HOTBAR, TOTAL);
+        if (s.count > 0) this.moveInto(s, 0, HOTBAR);
+        if (s.count > 0) this.put(area, i, s);
       }
       this.render();
     }
     swapWithHotbar(n) {
-      if (this.hovered < 0 || n < 0 || n >= HOTBAR || this.hovered === n) return;
-      const t = this.slots[n];
-      this.slots[n] = this.slots[this.hovered];
-      this.slots[this.hovered] = t;
+      const h = this.hovered;
+      if (!h || n < 0 || n >= HOTBAR || h.area === 'result' || (h.area === 'inv' && h.index === n)) return;
+      const a = this.stackAt(h.area, h.index), b = this.slots[n];
+      if (b && !this.accepts(h.area, h.index, b.id)) return;
+      this.put(h.area, h.index, b);
+      this.slots[n] = a;
       this.render();
     }
     sort() {
-      const items = [];
-      for (let i = HOTBAR; i < TOTAL; i++) { if (this.slots[i]) items.push(this.slots[i]); this.slots[i] = null; }
-      const merged = new Map();
-      for (const s of items) merged.set(s.id, (merged.get(s.id) || 0) + s.count);
+      const keep = [], merged = new Map();
+      for (let i = HOTBAR; i < TOTAL; i++) {
+        const s = this.slots[i];
+        this.slots[i] = null;
+        if (!s) continue;
+        if (this.maxOf(s.id) <= 1) keep.push(s); else merged.set(s.id, (merged.get(s.id) || 0) + s.count);
+      }
       const ids = Array.from(merged.keys()).sort((a, b) => a - b);
       let k = HOTBAR;
       for (const id of ids) {
@@ -5728,21 +6379,105 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         const max = this.maxOf(id);
         while (n > 0 && k < TOTAL) { const c = Math.min(n, max); this.slots[k++] = { id, count: c }; n -= c; }
       }
+      keep.sort((a, b) => a.id - b.id);
+      for (const s of keep) { if (k < TOTAL) this.slots[k++] = s; else this.moveInto(s, 0, TOTAL); }
       this.render();
     }
 
+    // ------------------------------------------------------------ recipe book
+    toggleRecipes(force) {
+      const d = this.dom;
+      if (!d.recipePanel) return;
+      const show = force === undefined ? d.recipePanel.classList.contains('hidden') : !!force;
+      if (show && !this.recipesBuilt) this.buildRecipes();
+      d.recipePanel.classList.toggle('hidden', !show);
+      if (d.recipesBtn) d.recipesBtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    }
+    buildRecipes() {
+      const C = OM.Crafting, panel = this.dom.recipePanel;
+      this.recipesBuilt = true;
+      panel.innerHTML = '';
+      const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+      const first = (spec) => (Array.isArray(spec) ? spec[0] : spec);
+      const names = (spec) => (Array.isArray(spec) ? spec : [spec]).map((id) => OM.Items.get(id).name).join(' or ');
+      const cell = (spec) => {
+        const el = h('div', 'rcell'), d = OM.Items.get(first(spec));
+        if (d && d.icon) { const im = new Image(); im.src = d.icon; im.alt = ''; im.draggable = false; el.appendChild(im); }
+        el.title = names(spec);
+        return el;
+      };
+      panel.appendChild(h('h2', null, 'Recipes'));
+      panel.appendChild(h('p', 'muted', 'Make small things in the 2×2 grid of your inventory. Anything bigger needs a crafting table (3×3). Shaped recipes also work mirrored.'));
+      panel.appendChild(h('div', 'inv-label', 'Crafting'));
+      for (const r of C.recipes) {
+        const row = h('div', 'recipe'), grid = h('div', 'rgrid');
+        if (r.list) {
+          grid.style.gridTemplateColumns = `repeat(${r.list.length}, 30px)`;
+          r.list.forEach((spec) => grid.appendChild(cell(spec)));
+        } else {
+          grid.style.gridTemplateColumns = `repeat(${r.w}, 30px)`;
+          for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
+            const ch = r.rows[y].charAt(x) || ' ';
+            grid.appendChild(ch === ' ' ? h('div', 'rcell empty') : cell(r.key[ch]));
+          }
+        }
+        const out = cell(r.out);
+        if (r.count > 1) out.appendChild(h('span', 'rcount', String(r.count)));
+        row.appendChild(grid);
+        row.appendChild(h('span', 'rarrow', '→'));
+        row.appendChild(out);
+        row.appendChild(h('div', 'rname', OM.Items.get(r.out).name + (!r.list && (r.w > 2 || r.h > 2) ? ' · table' : '')));
+        panel.appendChild(row);
+      }
+      panel.appendChild(h('div', 'inv-label', 'Furnace (' + C.SMELT_SECONDS + ' s per item)'));
+      for (const [from, to] of C.SMELT) {
+        const row = h('div', 'recipe');
+        row.appendChild(cell(from));
+        row.appendChild(h('span', 'rarrow', '→'));
+        row.appendChild(cell(to));
+        row.appendChild(h('div', 'rname', OM.Items.get(from).name + ' → ' + OM.Items.get(to).name));
+        panel.appendChild(row);
+      }
+      panel.appendChild(h('div', 'inv-label', 'Fuel (seconds of fire)'));
+      const fuels = h('div', 'rfuels');
+      for (const [id, secs] of C.FUEL) {
+        const c = cell(id);
+        c.title = OM.Items.get(id).name + ' — burns ' + secs + ' s';
+        c.appendChild(h('span', 'rcount', String(secs)));
+        fuels.appendChild(c);
+      }
+      panel.appendChild(fuels);
+      panel.appendChild(h('p', 'muted', 'Tools: a better pickaxe digs deeper — wood and stone for coal and iron, iron for diamonds. Right-click a crafting table or furnace to use it.'));
+    }
+
     // ------------------------------------------------------------ open/close
-    open() {
+    /** mode: 'inv' (E), 'table' (crafting table) or 'furnace' (pass the furnace to show). */
+    open(mode, furnace) {
       if (this.isOpen) return;
+      this.mode = mode === 'table' || (mode === 'furnace' && furnace) ? mode : 'inv';
+      this.furnace = this.mode === 'furnace' ? furnace : null;
       this.isOpen = true;
-      this.dom.screen.classList.remove('hidden');
+      const d = this.dom;
+      if (d.title) d.title.textContent = TITLES[this.mode];
+      d.craft.classList.toggle('hidden', this.mode === 'furnace');
+      d.furnace.classList.toggle('hidden', this.mode !== 'furnace');
+      if (this.mode !== 'furnace') this.buildCraftGrid();
+      d.screen.classList.remove('hidden');
       this.render();
     }
     close() {
       if (!this.isOpen) return;
-      if (this.cursor) { const left = this.add(this.cursor.id, this.cursor.count); this.cursor = null; if (left) console.warn('[OpenMeadow] inventory full, dropped', left); }
+      // Ingredients go back to the bag; whatever does not fit stays in the grid / in the hand for next time.
+      if (this.mode !== 'furnace') {
+        const g = this.grid();
+        for (let i = 0; i < g.length; i++) { const s = g[i]; if (s) { this.moveInto(s, 0, TOTAL); if (s.count <= 0) g[i] = null; } }
+      }
+      const c = this.cursor;
+      if (c) { this.moveInto(c, 0, TOTAL); if (c.count <= 0) this.cursor = null; }
+      if (this.notify && (this.cursor || (this.mode !== 'furnace' && this.grid().some(Boolean)))) this.notify('Your bag is full — some items stayed in the crafting grid or in your hand');
       this.isOpen = false;
-      this.hovered = -1;
+      this.hovered = null;
+      this.furnace = null;
       this.showTooltip(null);
       this.dom.screen.classList.add('hidden');
       this.render();
@@ -5752,17 +6487,40 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     starterKit() {
       const B = OM.B, I = OM.I, P = OM.P;
       this.slots.fill(null);
+      this.grids.inv.fill(null); this.grids.table.fill(null);
+      this.cursor = null;
       const kit = [[B.PLANKS, 32], [B.COBBLE, 32], [B.GLASS, 16], [B.STONE_BRICKS, 24], [B.OAK_LOG, 12], [I.WATER_BUCKET, 1], [B.BRICKS, 16], [100 + P.POPPY, 6], [100 + P.DAISY, 6]];
       kit.forEach(([id, n], i) => { this.slots[i] = { id, count: n }; });
       this.selected = 0;
       this.render();
     }
-    serialize() { return { slots: this.slots.map((s) => (s ? [s.id, s.count] : 0)), selected: this.selected }; }
+    serialize() {
+      return {
+        slots: this.slots.map(encode), selected: this.selected,
+        grids: { inv: this.grids.inv.map(encode), table: this.grids.table.map(encode) },
+        cursor: encode(this.cursor)
+      };
+    }
+    decode(s) {
+      if (!Array.isArray(s)) return null;
+      const def = OM.Items.get(s[0]);
+      if (!def) return null;
+      const out = { id: s[0], count: Math.max(1, Math.min(def.max, s[1] | 0)) };
+      if (def.dur && s[2] > 0) out.dmg = Math.min(def.dur - 1, s[2] | 0);
+      return out;
+    }
     deserialize(d) {
       if (!d || !Array.isArray(d.slots)) return false;
       this.slots = new Array(TOTAL).fill(null);
-      d.slots.slice(0, TOTAL).forEach((s, i) => { if (s && OM.Items.get(s[0])) this.slots[i] = { id: s[0], count: Math.max(1, Math.min(this.maxOf(s[0]), s[1] | 0)) }; });
+      d.slots.slice(0, TOTAL).forEach((s, i) => { this.slots[i] = this.decode(s); });
       this.selected = Math.max(0, Math.min(HOTBAR - 1, d.selected | 0));
+      for (const key of ['inv', 'table']) {
+        this.grids[key] = new Array(key === 'table' ? 9 : 4).fill(null);
+        const saved = d.grids && Array.isArray(d.grids[key]) ? d.grids[key] : [];
+        saved.slice(0, this.grids[key].length).forEach((s, i) => { this.grids[key][i] = this.decode(s); });
+      }
+      this.cursor = this.decode(d.cursor);
+      if (this.cursor) { this.moveInto(this.cursor, 0, TOTAL); if (this.cursor.count <= 0) this.cursor = null; }
       this.render();
       return true;
     }
@@ -6015,22 +6773,33 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     G.player = new OM.Player(G.world);
     G.inventory = new OM.Inventory({
       hotbar: $('hotbar'), itemName: $('item-name'), screen: $('inventory-screen'), main: $('inv-main'), bar: $('inv-hotbar'),
-      trash: $('inv-trash'), sortBtn: $('inv-sort'), tooltip: $('inv-tooltip'), cursor: $('cursor-stack')
+      trash: $('inv-trash'), sortBtn: $('inv-sort'), tooltip: $('inv-tooltip'), cursor: $('cursor-stack'),
+      title: $('inv-title'), craft: $('craft-area'), craftGrid: $('craft-grid'), craftResult: $('craft-result'),
+      furnace: $('furnace-area'), furnIn: $('furn-in'), furnFuel: $('furn-fuel'), furnOut: $('furn-out'), furnFlame: $('furn-flame'), furnProg: $('furn-prog'),
+      recipesBtn: $('inv-recipes'), recipePanel: $('recipe-panel')
     });
+    G.inventory.notify = (text) => toast(text);
     G.audio = new OM.AudioFX();
     G.interaction = new OM.Interaction({
       world: G.world, player: G.player, inventory: G.inventory, scene: G.scene, camera: G.camera,
       textures: G.textures, audio: G.audio, toast
     });
+    G.interaction.onUse = (block, x, y, z) => {
+      if (block === OM.B.CRAFTING_TABLE) openInventory('table');
+      else if (block === OM.B.FURNACE) openInventory('furnace', OM.Furnaces.at(x, y, z));
+    };
     hookPlayer();
 
+    OM.Furnaces.clear();
     if (mp) {
       setupMultiplayer(welcome, net);
       const ms = loadMpSave();
       if (!(ms && ms.seed === seed && G.inventory.deserialize(ms.inventory))) G.inventory.starterKit();
+      else OM.Furnaces.deserialize(ms.furnaces);   // furnaces are private to each player in a room (the server only knows blocks)
     } else if (save) {
       try { G.world.deserialize(save.world || {}); } catch (e) { console.warn('[OpenMeadow] world edits could not be restored', e); }
       if (!G.inventory.deserialize(save.inventory)) G.inventory.starterKit();
+      OM.Furnaces.deserialize(save.furnaces);
     } else G.inventory.starterKit();
 
     G.spawn = G.world.gen.findSpawn();
@@ -6171,9 +6940,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     requestLock();
   }
   function resume() { G.audio.unlock(); setState('playing'); requestLock(); }
-  function openInventory() {
+  /** mode: 'inv' (E), 'table' (a crafting table) or 'furnace' (pass that furnace). */
+  function openInventory(mode, furnace) {
     setState('inventory');
-    G.inventory.open();
+    G.inventory.open(mode, furnace);
     if (isLocked()) document.exitPointerLock();
   }
   function closeInventory(backToGame) {
@@ -6242,7 +7012,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         if (e.code.startsWith('Digit')) {
           const n = Number(e.code.slice(5)) - 1;
           if (n >= 0 && n < 9) G.inventory.select(n);
-        } else if (e.code === 'KeyE' && !e.repeat) openInventory();
+        } else if (e.code === 'KeyE' && !e.repeat) openInventory('inv');
         else if (e.code === 'KeyT' && G.mp && !e.repeat) { e.preventDefault(); openChat(); }
         else if (e.code === 'Tab' && G.mp) OM.MpUI.showPlayers(true);
         else if (e.code === 'Enter' && !isLocked()) { G.lockFailures = 0; requestLock(); }
@@ -6501,7 +7271,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   function saveGame(silent) {
     if (!G.started) return false;
     if (G.mp) { // the world is on the server: keep only this player's inventory, per server + room
-      const ok = store.set(mpSaveKey(), JSON.stringify({ version: 1, seed: G.seed, savedAt: Date.now(), inventory: G.inventory.serialize() }));
+      const ok = store.set(mpSaveKey(), JSON.stringify({ version: 1, seed: G.seed, savedAt: Date.now(), inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize() }));
       if (!silent) toast(ok ? 'Inventory saved (the world lives on the server)' : 'Could not save — browser storage is unavailable or full');
       return ok;
     }
@@ -6509,7 +7279,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     const data = {
       version: 1, seed: G.seed, time: G.sky.time, savedAt: Date.now(),
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, health: P.health },
-      inventory: G.inventory.serialize(), world: G.world.serialize()
+      inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize(), world: G.world.serialize()
     };
     const ok = store.set(SAVE_KEY, JSON.stringify(data));
     if (ok) G.save = data;
@@ -6663,7 +7433,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     if (live) G.wildlife.update(dt, G.centerVec, G.sky.daylight, G.fog.color, G.fog.near, G.fog.far);
     G.water.updateUniforms(G.time, G.sky, G.fog.near, G.fog.far, G.fog.color);
     G.interaction.setHandLight(G.sky.daylight, G.sky.sun.color);
-    if (simulate) G.interaction.update(dt, G.input, st === 'playing');
+    if (simulate) { G.interaction.update(dt, G.input, st === 'playing'); OM.Furnaces.update(Math.min(dt, 0.25)); G.inventory.update(); }
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);

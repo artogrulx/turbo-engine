@@ -122,6 +122,19 @@ class RoomRules(unittest.TestCase):
         self.assertEqual(replay['w'], [3, 51, -2, 24])
         self.assertEqual(replay['p'], [4, 50, -2, (77 << 8) | 4])
 
+    def test_every_block_id_below_64_is_accepted_but_nothing_above(self):
+        # crafting table 24, furnace 25 and diamond ore 26 arrived with the adventure update; the range is reserved up to 63
+        a, b = make_client(self.hub, 'Ann', pos=(0, 41, 0)), make_client(self.hub, 'Bob', pos=(0, 41, 0))
+        a.box.clear(); b.box.clear()
+        for i, v in enumerate((24, 25, 26, 63)):
+            echo = {'t': 'block', 'x': i, 'y': 41, 'z': 0, 'v': v}
+            self.hub.handle(a, dict(echo))
+            self.assertIn(echo, b.box, v)
+        n = len(b.box)
+        for v in (64, 99, 255):
+            self.hub.handle(a, {'t': 'block', 'x': 9, 'y': 41, 'z': 0, 'v': v})
+        self.assertEqual(len(b.box), n)
+
     def test_last_write_wins_for_everyone(self):
         a, b = make_client(self.hub, pos=(0, 41, 0)), make_client(self.hub, 'Bob', pos=(0, 41, 0))
         self.hub.handle(a, {'t': 'block', 'x': 1, 'y': 40, 'z': 1, 'v': 5})

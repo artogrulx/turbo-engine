@@ -199,8 +199,8 @@ h2 { margin: 0 0 14px; font-size: 24px; }
 .head-actions { display: flex; gap: 8px; }
 .inv-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 10px 0 6px; }
 .slot-grid { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 6px; }
-#inv-main .slot, #inv-hotbar .slot { cursor: pointer; }
-#inv-main .slot:hover, #inv-hotbar .slot:hover, .trash:hover { border-color: var(--sun); background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.12)); }
+#inv-main .slot, #inv-hotbar .slot, .craft-area .slot { cursor: pointer; }
+#inv-main .slot:hover, #inv-hotbar .slot:hover, .craft-area .slot:hover, .trash:hover { border-color: var(--sun); background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(0, 0, 0, 0.12)); }
 .inv-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; }
 .inv-help { font-size: 12px; color: var(--muted); max-width: 70%; }
 .trash { cursor: pointer; border-color: rgba(226, 87, 76, 0.5); }
@@ -219,6 +219,55 @@ h2 { margin: 0 0 14px; font-size: 24px; }
   background: none; border: none; box-shadow: none; width: 52px; height: 52px;
 }
 #cursor-stack.show { display: grid; }
+
+/* ------------------------------------------- crafting, furnace, recipe book */
+.inv-wrap { display: flex; align-items: flex-start; justify-content: center; gap: 14px; max-width: 100%; max-height: 100%; overflow: auto; padding: 2px; }
+.inv-wrap > .panel { max-height: calc(100vh - 36px); }
+.craft-area {
+  display: flex; align-items: center; gap: 16px; width: fit-content; margin: 4px 0 2px; padding: 10px 14px;
+  border-radius: 14px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--line);
+}
+.craft-grid { display: grid; gap: 6px; }
+.craft-arrow {
+  width: 34px; height: 22px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='rgba(255,255,255,0.35)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.result-slot { width: calc(var(--slot) * 1.2); height: calc(var(--slot) * 1.2); border-color: rgba(245, 211, 106, 0.55); }
+.furn-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.flame, .prog { position: relative; flex: none; }
+.flame {
+  width: 26px; height: 30px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 30'%3E%3Cpath d='M13 1C14 8 22 11 22 20 22 26 18 29 13 29 8 29 4 26 4 20 4 15 7 13 8 9 10 11 11 13 11 15 13 11 13 6 13 1Z' fill='rgba(255,255,255,0.18)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.flame i {
+  position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--fill, 0) * 100%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 30'%3E%3Cpath d='M13 1C14 8 22 11 22 20 22 26 18 29 13 29 8 29 4 26 4 20 4 15 7 13 8 9 10 11 11 13 11 15 13 11 13 6 13 1Z' fill='%23ff9a2e'/%3E%3Cpath d='M13 14C16 18 18 20 18 23 18 26 16 27 13 27 10 27 8 26 8 23 8 20 11 18 13 14Z' fill='%23ffe27a'/%3E%3C/svg%3E") left bottom / 26px 30px no-repeat;
+}
+.prog {
+  width: 48px; height: 24px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='rgba(255,255,255,0.18)'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.prog i {
+  position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--fill, 0) * 100%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 24'%3E%3Cpath d='M0 8H30V0L48 12 30 24V16H0Z' fill='%23a7ee7a'/%3E%3C/svg%3E") left center / 48px 24px no-repeat;
+}
+.slot-dur { position: absolute; left: 7px; right: 7px; bottom: 4px; height: 4px; border-radius: 2px; background: rgba(0, 0, 0, 0.72); display: none; pointer-events: none; overflow: hidden; }
+.slot-dur i { display: block; height: 100%; }
+.recipe-panel { width: min(390px, 92vw); padding: 18px 18px 16px; }
+.recipe-panel h2 { margin-bottom: 6px; }
+.recipe-panel .muted { margin: 4px 0 6px; line-height: 1.4; }
+.recipe { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.rgrid { display: grid; gap: 2px; flex: none; }
+.rcell {
+  position: relative; width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.rcell.empty { background: rgba(255, 255, 255, 0.025); border-color: rgba(255, 255, 255, 0.05); }
+.rcell img { width: 24px; height: 24px; image-rendering: pixelated; pointer-events: none; }
+.rcount { position: absolute; right: 1px; bottom: -2px; font-size: 11px; font-weight: 700; text-shadow: 1px 1px 0 #000, 0 0 3px #000; pointer-events: none; }
+.rarrow { color: var(--muted); flex: none; }
+.rname { font-size: 13px; line-height: 1.25; min-width: 0; }
+.rfuels { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
 
 /* -------------------------------------------------------------- settings */
 .settings-panel { width: min(560px, 100%); }
@@ -315,6 +364,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   #hint { max-width: calc(100vw - 36px); font-size: 12px; }
   :root { --slot: clamp(32px, 9.4vw, 44px); }
   .slot-grid { gap: 4px; }
+  .inv-wrap { flex-direction: column; align-items: center; }
+  .craft-grid { gap: 4px; }
+  .craft-area { gap: 10px; padding: 8px 10px; }
   #hotbar { gap: 4px; }
   #status { width: calc(var(--slot) * 9 + 4px * 8); }
 }

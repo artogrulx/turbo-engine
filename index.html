@@ -25,7 +25,7 @@
     </div>
     <div id="hint">
       <b>WASD</b> move · <b>Space</b> jump / swim up · <b>Shift</b> sprint · <b>C</b> crouch / dive<br>
-      <b>Left click</b> mine · <b>Right click</b> place · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory · <b>Esc</b> pause
+      <b>Left click</b> mine · <b>Right click</b> place / use · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory &amp; crafting · <b>Esc</b> pause
     </div>
     <div id="item-name"></div>
     <div id="status">
@@ -48,24 +48,42 @@
 
   <div id="toasts"></div>
 
-  <!-- Inventory -->
+  <!-- Inventory, crafting table and furnace -->
   <div id="inventory-screen" class="screen hidden">
-    <div class="panel inv-panel">
-      <div class="panel-head">
-        <h2>Inventory</h2>
-        <div class="head-actions">
-          <button id="inv-sort" class="btn small" type="button">Sort</button>
-          <button id="inv-close" class="btn small icon" type="button" aria-label="Close inventory">✕</button>
+    <div class="inv-wrap">
+      <div class="panel inv-panel">
+        <div class="panel-head">
+          <h2 id="inv-title">Inventory</h2>
+          <div class="head-actions">
+            <button id="inv-recipes" class="btn small" type="button" aria-pressed="false">Recipes</button>
+            <button id="inv-sort" class="btn small" type="button">Sort</button>
+            <button id="inv-close" class="btn small icon" type="button" aria-label="Close inventory">✕</button>
+          </div>
+        </div>
+        <div id="craft-area" class="craft-area">
+          <div id="craft-grid" class="craft-grid"></div>
+          <div class="craft-arrow" aria-hidden="true"></div>
+          <div id="craft-result" class="slot result-slot" title="Crafting result"></div>
+        </div>
+        <div id="furnace-area" class="craft-area hidden">
+          <div class="furn-col">
+            <div id="furn-in" class="slot" title="Something to smelt"></div>
+            <div id="furn-flame" class="flame" title="Fire"><i></i></div>
+            <div id="furn-fuel" class="slot" title="Fuel"></div>
+          </div>
+          <div id="furn-prog" class="prog" title="Smelting progress"><i></i></div>
+          <div id="furn-out" class="slot result-slot" title="Result"></div>
+        </div>
+        <div class="inv-label">Storage</div>
+        <div id="inv-main" class="slot-grid"></div>
+        <div class="inv-label">Hotbar</div>
+        <div id="inv-hotbar" class="slot-grid"></div>
+        <div class="inv-foot">
+          <div class="inv-help">Click to pick up / place · Right-click to split · Shift+click to move · hover + 1–9 to swap · E to close</div>
+          <div id="inv-trash" class="slot trash" title="Delete the held stack"><span class="trash-icon" aria-hidden="true"></span></div>
         </div>
       </div>
-      <div class="inv-label">Storage</div>
-      <div id="inv-main" class="slot-grid"></div>
-      <div class="inv-label">Hotbar</div>
-      <div id="inv-hotbar" class="slot-grid"></div>
-      <div class="inv-foot">
-        <div class="inv-help">Click to pick up / place · Right-click to split · Shift+click to move · hover + 1–9 to swap · E to close</div>
-        <div id="inv-trash" class="slot trash" title="Delete the held stack"><span class="trash-icon" aria-hidden="true"></span></div>
-      </div>
+      <div id="recipe-panel" class="panel recipe-panel hidden"></div>
     </div>
     <div id="inv-tooltip"></div>
     <div id="cursor-stack" class="slot cursor"><img class="slot-icon" alt="" draggable="false"><span class="slot-count"></span></div>
@@ -173,16 +191,16 @@
         <kbd>C</kbd><span>Crouch (won't walk off edges) · dive</span>
         <kbd>Mouse</kbd><span>Look around (arrow keys also work)</span>
         <kbd>Left click</kbd><span>Hold to mine a block, click to pick a flower</span>
-        <kbd>Right click</kbd><span>Place block / flower · use bucket</span>
+        <kbd>Right click</kbd><span>Place block / flower · use bucket · open a crafting table or furnace (crouch to build against it)</span>
         <kbd>Middle click</kbd><span>Pick the block you are looking at</span>
         <kbd>1 – 9 · Wheel</kbd><span>Choose hotbar slot</span>
-        <kbd>E</kbd><span>Open / close inventory</span>
+        <kbd>E</kbd><span>Open / close inventory and the 2×2 crafting grid (Recipes button lists every recipe)</span>
         <kbd>Esc</kbd><span>Pause and release the mouse</span>
         <kbd>T</kbd><span>Chat (multiplayer)</span>
         <kbd>Tab</kbd><span>Hold to list the players (multiplayer)</span>
         <kbd>F3</kbd><span>Debug information</span>
       </div>
-      <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill.</p>
+      <p class="muted">Tip: an empty bucket scoops up still water; pour it on a hillside and watch it run downhill. Stone needs a pickaxe, iron needs a stone one, diamonds need an iron one.</p>
       <div class="menu-buttons"><button id="btn-controls-back" class="btn primary" type="button">Back</button></div>
     </div>
   </div>
@@ -250,6 +268,7 @@
 
   <script src="engine/noise.js"></script>
   <script src="engine/blocks.js"></script>
+  <script src="engine/crafting.js"></script>
   <script src="engine/textures.js"></script>
   <script src="engine/terrain.js"></script>
   <script src="engine/mesher.js"></script>

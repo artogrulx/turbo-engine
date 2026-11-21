@@ -1,8 +1,8 @@
 /* Open Meadow — engine/interaction.js
  * Everything the player does to the world with the mouse:
  *   - targeting (voxel ray cast, plants included) with an outline box
- *   - hold-to-mine with hardness-based timing and a crack overlay
- *   - block / flower / water placement with occupancy and body checks
+ *   - hold-to-mine with hardness-based timing (tools, harvest levels and wear: see crafting.js) and a crack overlay
+ *   - block / flower / water placement with occupancy and body checks; crafting tables and furnaces open instead
  *   - break particles and the first-person held-item view with swing     */
 (function () {
   'use strict';
@@ -18,6 +18,7 @@
       this.audio = o.audio || null; this.toast = o.toast || (() => {});
       this.net = null;     // OM.Net while in a multiplayer room: every player-made change is also sent to the server
       this.remote = null;  // OM.RemotePlayers: blocks may not be placed inside another player
+      this.onUse = null;   // (blockId, x, y, z) => void — right-clicking a crafting table or furnace
       this.dir = new THREE.Vector3();
       this.target = null;
       this.mining = false; this.progress = 0; this.mx = 0; this.my = 0; this.mz = 0;
@@ -118,13 +119,13 @@
           }
           this.resetMining();
         } else if (this.cooldown <= 0) {
-          const hard = BL.HARD[hit.block];
-          if (this.mining && this.mx === hit.x && this.my === hit.y && this.mz === hit.z) this.progress += dt / hard;
-          else { this.mining = true; this.mx = hit.x; this.my = hit.y; this.mz = hit.z; this.progress = dt / hard; }
+          const mine = OM.Crafting.mining(hit.block, stack ? stack.id : 0);   // the held tool decides speed and whether anything drops
+          if (this.mining && this.mx === hit.x && this.my === hit.y && this.mz === hit.z) this.progress += dt / mine.time;
+          else { this.mining = true; this.mx = hit.x; this.my = hit.y; this.mz = hit.z; this.progress = dt / mine.time; }
           this.swing(true);
           if (this.audio && Math.random() < dt * 5) this.audio.play('hit', BL.defs[hit.block].sound);
           if (this.progress >= 1) {
-            this.breakBlock(hit);
+            this.breakBlock(hit, mine);
             this.resetMining();
             this.cooldown = 0.14;
           }
@@ -149,18 +150,36 @@
       this.updateHeld(dt);
     }
 
-    breakBlock(hit) {
+    breakBlock(hit, mine) {
       const def = BL.defs[hit.block];
       if (!this.world.setBlock(hit.x, hit.y, hit.z, 0)) return;
       if (this.net) this.net.sendBlock(hit.x, hit.y, hit.z, 0);
-      if (def.drop) this.give(def.drop, 1);
+      mine = mine || OM.Crafting.mining(hit.block, 0);
+      const drop = mine.drops ? OM.Crafting.dropFor(hit.block) : 0;
+      if (drop) this.give(drop, 1);
+      if (hit.block === OM.B.FURNACE) for (const s of OM.Furnaces.take(hit.x, hit.y, hit.z)) this.give(s.id, s.count);   // its contents are never lost
+      this.wearTool();
       this.burst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, def.color, 16, 1);
       if (this.audio) this.audio.play('break', def.sound);
     }
 
+    /** Breaking a block costs the held tool one use (a sword two); a tool at zero is gone. */
+    wearTool() {
+      const stack = this.inventory.selectedItem(), item = stack ? OM.Items.get(stack.id) : null;
+      if (!item || item.kind !== 'tool') return;
+      if (this.inventory.damageSelected(item.tool === 'sword' ? 2 : 1)) {
+        this.toast('Your ' + item.name + ' broke');
+        if (this.audio) this.audio.play('break', 'stone');
+      }
+    }
+
     place(hit, item, stack) {
-      if (!item) return;
       const W = this.world;
+      if (hit && hit.kind === 'block' && !this.player.sneaking && this.onUse && (hit.block === OM.B.CRAFTING_TABLE || hit.block === OM.B.FURNACE)) {
+        this.onUse(hit.block, hit.x, hit.y, hit.z);     // crouch to build against a table instead
+        return;
+      }
+      if (!item) return;
       if (item.kind === 'bucket') {
         if (hit && hit.kind === 'water' && W.setWater(hit.x, hit.y, hit.z, 0)) {
           if (this.net) this.net.sendWater(hit.x, hit.y, hit.z, 0);

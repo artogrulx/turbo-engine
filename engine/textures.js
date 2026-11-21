@@ -240,6 +240,60 @@
     });
   }
 
+  function pCraftTop(t) {
+    pPlanks(t, [174, 140, 86]);
+    const rim = [96, 70, 42], line = [112, 82, 50];
+    for (let i = 0; i < 32; i++) for (const k of [0, 1, 30, 31]) { t.set(i, k, rim); t.set(k, i, rim); }
+    for (let i = 2; i < 30; i++) for (const k of [10, 21]) { t.set(i, k, line); t.set(k, i, line); }
+    // a few inlaid squares so the grid reads as a work surface
+    for (const [cx, cy, c] of [[5, 5, [196, 70, 58]], [26, 26, [70, 112, 196]], [26, 5, [92, 154, 84]]]) {
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) t.set(cx + x, cy + y, mul(c, 1 - (Math.abs(x) + Math.abs(y)) * 0.04));
+    }
+  }
+  function pCraftSide(t) {
+    pPlanks(t, [166, 132, 82]);
+    const rim = [96, 70, 42];
+    for (let i = 0; i < 32; i++) { t.set(i, 0, rim); t.set(i, 1, rim); t.set(i, 31, mul(rim, 0.85)); t.set(0, i, rim); t.set(31, i, rim); }
+    for (let y = 2; y < 6; y++) for (let x = 1; x < 31; x++) t.set(x, y, mul([150, 116, 70], 0.9 + (y - 2) * 0.03));
+    // a saw (left) and a hammer (right) hanging below the top rail
+    for (let y = 8; y < 25; y++) for (let x = 6; x < 15; x++) t.set(x, y, x === 6 || x === 14 ? [120, 124, 132] : mul([198, 202, 210], 0.92 + ((x + y) % 3) * 0.04));
+    for (let x = 6; x < 15; x += 2) t.set(x, 25, [120, 124, 132]);
+    for (let y = 8; y < 14; y++) for (let x = 7; x < 14; x++) t.set(x, y, [112, 82, 50]);
+    for (let y = 9; y < 27; y++) { t.set(22, y, [120, 88, 52]); t.set(23, y, [146, 110, 68]); }
+    for (let y = 8; y < 14; y++) for (let x = 17; x < 29; x++) t.set(x, y, mul(x > 25 ? [96, 100, 108] : [176, 180, 190], y === 8 ? 1.12 : 1));
+  }
+  function pFurnaceTop(t) {
+    pStone(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [150, 150, 156], 0.35); });
+    for (let i = 0; i < 32; i++) for (const k of [0, 1, 2]) { const c = mul([84, 84, 90], 1 - k * 0.1); t.set(i, k, c); t.set(i, 31 - k, c); t.set(k, i, c); t.set(31 - k, i, c); }
+    for (let y = 9; y < 23; y++) for (let x = 9; x < 23; x++) t.set(x, y, mul([30, 30, 34], 1 + ((x + y) % 4) * 0.05));
+    for (let y = 9; y < 23; y++) { t.set(9, y, [62, 62, 68]); t.set(22, y, [62, 62, 68]); }
+    for (let x = 9; x < 23; x++) { t.set(x, 9, [62, 62, 68]); t.set(x, 22, [62, 62, 68]); }
+  }
+  function pFurnaceSide(t) {
+    pCobble(t, false);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [138, 138, 144], 0.3); });
+    for (let i = 0; i < 32; i++) { t.set(i, 0, [84, 84, 90]); t.set(i, 1, [100, 100, 106]); t.set(0, i, [96, 96, 102]); t.set(31, i, [96, 96, 102]); }
+    for (let y = 14; y < 27; y++) for (let x = 8; x < 24; x++) t.set(x, y, mul([22, 20, 22], 1 + ((x * 3 + y) % 5) * 0.03));
+    for (let x = 6; x < 26; x++) { t.set(x, 12, [66, 66, 72]); t.set(x, 13, [54, 54, 60]); }
+    for (let y = 12; y < 27; y++) { t.set(6, y, [66, 66, 72]); t.set(7, y, [54, 54, 60]); t.set(24, y, [54, 54, 60]); t.set(25, y, [66, 66, 72]); }
+    for (let x = 9; x < 23; x++) {                                                 // embers glowing at the bottom of the mouth
+      const h = 1 + Math.floor((Math.sin(x * 1.7) + 1.3) * 1.6);
+      for (let k = 0; k < h; k++) t.set(x, 26 - k, k === 0 ? [236, 130, 36] : mix([236, 130, 36], [250, 214, 90], k / h));
+    }
+  }
+  function pDiamondOre(t) {
+    pStone(t);
+    const gem = [[1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [1, 3], [2, 3]];
+    for (let i = 0; i < 6; i++) {
+      const cx = 2 + Math.floor(t.r() * 26), cy = 2 + Math.floor(t.r() * 26);
+      for (const [dx, dy] of gem) {
+        const c = dx === 1 && dy === 1 ? [214, 252, 250] : (dx >= 2 && dy >= 2) || dy === 3 ? [36, 158, 172] : [88, 224, 228];
+        t.set(cx + dx, cy + dy, c);
+      }
+    }
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -265,7 +319,9 @@
     coal_ore: (t) => pOre(t, [[34, 34, 36], [52, 52, 54], [24, 24, 26]]),
     iron_ore: (t) => pOre(t, [[214, 172, 130], [188, 140, 102], [230, 196, 160]]),
     bedrock: pBedrock, snow: pSnow, snow_side: pSnowSide, stone_bricks: pStoneBricks,
-    birch_planks: (t) => pPlanks(t, [206, 186, 134])
+    birch_planks: (t) => pPlanks(t, [206, 186, 134]),
+    crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
+    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre
   };
 
   function buildBlockAtlas() {
@@ -654,11 +710,127 @@
         const col = t % plant.cols, row = Math.floor(t / plant.cols);
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(plant.canvas, col * plant.size, row * plant.size, plant.size, plant.size, 2, 2, S - 4, S - 4);
+      } else if (item.kind === 'tool') {
+        const tier = OM.Crafting ? OM.Crafting.TIERS[item.tierIdx] : null;
+        drawSprite(ctx, toolSprite(item.tool, tier ? tier.color : [180, 180, 180]));
+      } else if (item.kind === 'material') {
+        drawSprite(ctx, materialSprite(item.material));
       } else {
         drawBucket(ctx, item.kind === 'water_bucket');
       }
       item.icon = c.toDataURL();
     }
+  }
+
+  // ---- 16x16 pixel-art sprites for tools and materials (drawn at 4x with an automatic outline)
+  const OUTLINE = [28, 22, 20];
+  class Sprite {
+    constructor() { this.g = new Array(256).fill(null); }
+    p(x, y, c) { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < 16 && y >= 0 && y < 16) this.g[y * 16 + x] = c; }
+    at(x, y) { return x >= 0 && x < 16 && y >= 0 && y < 16 ? this.g[y * 16 + x] : null; }
+    line(x0, y0, x1, y1, c, c2) {                       // c = main colour, c2 = shadow pixel to the right
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + (x1 - x0) * (n ? i / n : 0), y = y0 + (y1 - y0) * (n ? i / n : 0);
+        if (c2) this.p(x + 1, y, c2);
+        this.p(x, y, c);
+      }
+    }
+    poly(pts, c) {                                       // fill by pixel-centre point-in-polygon
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const [xi, yi] = pts[i], [xj, yj] = pts[j];
+          if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+        }
+        if (inside) this.p(x, y, c);
+      }
+    }
+    outline() {
+      const out = this.g.slice();
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        if (this.g[y * 16 + x]) continue;
+        if (this.at(x - 1, y) || this.at(x + 1, y) || this.at(x, y - 1) || this.at(x, y + 1)) out[y * 16 + x] = OUTLINE;
+      }
+      this.g = out;
+    }
+  }
+  function drawSprite(ctx, sp) {
+    sp.outline();
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const c = sp.g[y * 16 + x];
+      if (!c) continue;
+      ctx.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+      ctx.fillRect(x * 4, y * 4, 4, 4);
+    }
+  }
+  const HANDLE = [[172, 128, 72], [118, 82, 46]];
+  function toolSprite(kind, col) {
+    const s = new Sprite();
+    const hi = mix(col, [255, 255, 255], 0.35), lo = mul(col, 0.66);
+    if (kind === 'sword') {
+      s.line(3, 12, 6, 9, HANDLE[0], HANDLE[1]);                           // grip
+      s.line(2, 13, 2, 13, [210, 180, 90]);                                // pommel
+      s.line(4, 8, 8, 12, [150, 120, 70], [104, 82, 50]);                  // cross-guard
+      for (let i = 0; i < 8; i++) { s.p(7 + i, 8 - i, hi); s.p(8 + i, 8 - i, col); s.p(9 + i, 8 - i, lo); }
+      s.p(14, 0, hi); s.p(15, 0, col);
+      return s;
+    }
+    s.line(2, 14, 11, 5, HANDLE[0], HANDLE[1]);                            // shaft
+    if (kind === 'pickaxe') {
+      for (let a = -96; a <= 6; a += 3) {                                  // arc around the shaft's upper end
+        const r = a * Math.PI / 180;
+        for (let d = 6.4; d <= 8.7; d += 0.5) {
+          const x = 5 + Math.cos(r) * d, y = 11 + Math.sin(r) * d;
+          s.p(x, y, d < 7.2 ? lo : d > 8.1 ? hi : col);
+        }
+      }
+    } else if (kind === 'axe') {
+      s.poly([[5.2, 2.4], [10.5, 1.4], [12.5, 4.2], [11.8, 8.6], [9.6, 8.8], [9.2, 6.0], [6.4, 5.2]], col);
+      s.line(5, 3, 10, 2, hi);
+      s.line(6, 6, 9, 6, lo);
+      s.line(10, 8, 12, 5, lo);
+      s.line(11, 5, 11, 5, HANDLE[0]);
+    } else {                                                                // shovel
+      s.poly([[9.2, 1.2], [14.4, 3.6], [14.0, 7.4], [10.6, 8.4], [8.0, 5.0]], col);
+      s.line(10, 2, 13, 4, hi);
+      s.line(13, 5, 12, 7, lo);
+      s.line(9, 6, 11, 7, lo);
+    }
+    return s;
+  }
+  function materialSprite(key) {
+    const s = new Sprite();
+    if (key === 'stick') {
+      s.line(3, 13, 12, 4, HANDLE[0], HANDLE[1]);
+      s.p(12, 3, [196, 156, 96]);
+    } else if (key === 'coal' || key === 'raw_iron') {
+      const base = key === 'coal' ? [48, 48, 54] : [176, 134, 108];
+      const hi = key === 'coal' ? [112, 112, 124] : [222, 184, 148], lo = key === 'coal' ? [22, 22, 26] : [122, 88, 70];
+      s.poly([[3, 7], [5, 3.2], [10, 2.6], [13.2, 6], [12.6, 11.4], [8, 13.4], [4, 11.6]], base);
+      s.poly([[4, 7], [5.6, 4.2], [8.4, 3.8], [6.6, 7.2]], hi);
+      s.poly([[8, 13], [12, 11], [12.4, 8], [9, 9.6]], lo);
+      if (key === 'raw_iron') { s.p(9, 5, [236, 206, 166]); s.p(6, 9, [140, 100, 78]); s.p(10, 8, [226, 190, 150]); s.p(5, 6, [128, 92, 72]); }
+      else { s.p(6, 5, [180, 180, 196]); s.p(9, 7, [78, 78, 90]); }
+    } else if (key === 'iron_ingot') {
+      s.poly([[2, 8], [6, 4.6], [14, 4.6], [10, 8]], [238, 240, 244]);
+      s.poly([[2, 8], [10, 8], [10, 12.4], [2, 12.4]], [196, 200, 210]);
+      s.poly([[10, 8], [14, 4.6], [14, 9], [10, 12.4]], [146, 150, 162]);
+      s.line(3, 9, 9, 9, [226, 230, 238]);
+    } else if (key === 'diamond') {
+      s.poly([[3, 6], [5, 3], [8, 3], [8, 6]], [170, 252, 252]);
+      s.poly([[8, 3], [11, 3], [13, 6], [8, 6]], [100, 228, 236]);
+      s.poly([[3, 6], [8, 6], [8, 13.4]], [54, 194, 210]);
+      s.poly([[8, 6], [13, 6], [8, 13.4]], [32, 148, 176]);
+      s.p(6, 4, [255, 255, 255]); s.p(5, 5, [220, 255, 255]);
+    } else {                                                                // flint
+      s.poly([[4, 10.4], [6.6, 4], [10.4, 5.4], [12.6, 10.6], [8.6, 13.2]], [74, 78, 90]);
+      s.poly([[6.6, 4.4], [9.8, 5.8], [8, 9], [5.6, 9.6]], [124, 130, 146]);
+      s.poly([[8.6, 13], [12.4, 10.6], [10.4, 8], [8, 9.6]], [44, 46, 56]);
+    }
+    return s;
   }
   function drawBucket(ctx, water) {
     ctx.imageSmoothingEnabled = true;

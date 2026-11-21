@@ -240,22 +240,33 @@
     G.player = new OM.Player(G.world);
     G.inventory = new OM.Inventory({
       hotbar: $('hotbar'), itemName: $('item-name'), screen: $('inventory-screen'), main: $('inv-main'), bar: $('inv-hotbar'),
-      trash: $('inv-trash'), sortBtn: $('inv-sort'), tooltip: $('inv-tooltip'), cursor: $('cursor-stack')
+      trash: $('inv-trash'), sortBtn: $('inv-sort'), tooltip: $('inv-tooltip'), cursor: $('cursor-stack'),
+      title: $('inv-title'), craft: $('craft-area'), craftGrid: $('craft-grid'), craftResult: $('craft-result'),
+      furnace: $('furnace-area'), furnIn: $('furn-in'), furnFuel: $('furn-fuel'), furnOut: $('furn-out'), furnFlame: $('furn-flame'), furnProg: $('furn-prog'),
+      recipesBtn: $('inv-recipes'), recipePanel: $('recipe-panel')
     });
+    G.inventory.notify = (text) => toast(text);
     G.audio = new OM.AudioFX();
     G.interaction = new OM.Interaction({
       world: G.world, player: G.player, inventory: G.inventory, scene: G.scene, camera: G.camera,
       textures: G.textures, audio: G.audio, toast
     });
+    G.interaction.onUse = (block, x, y, z) => {
+      if (block === OM.B.CRAFTING_TABLE) openInventory('table');
+      else if (block === OM.B.FURNACE) openInventory('furnace', OM.Furnaces.at(x, y, z));
+    };
     hookPlayer();
 
+    OM.Furnaces.clear();
     if (mp) {
       setupMultiplayer(welcome, net);
       const ms = loadMpSave();
       if (!(ms && ms.seed === seed && G.inventory.deserialize(ms.inventory))) G.inventory.starterKit();
+      else OM.Furnaces.deserialize(ms.furnaces);   // furnaces are private to each player in a room (the server only knows blocks)
     } else if (save) {
       try { G.world.deserialize(save.world || {}); } catch (e) { console.warn('[OpenMeadow] world edits could not be restored', e); }
       if (!G.inventory.deserialize(save.inventory)) G.inventory.starterKit();
+      OM.Furnaces.deserialize(save.furnaces);
     } else G.inventory.starterKit();
 
     G.spawn = G.world.gen.findSpawn();
@@ -396,9 +407,10 @@
     requestLock();
   }
   function resume() { G.audio.unlock(); setState('playing'); requestLock(); }
-  function openInventory() {
+  /** mode: 'inv' (E), 'table' (a crafting table) or 'furnace' (pass that furnace). */
+  function openInventory(mode, furnace) {
     setState('inventory');
-    G.inventory.open();
+    G.inventory.open(mode, furnace);
     if (isLocked()) document.exitPointerLock();
   }
   function closeInventory(backToGame) {
@@ -467,7 +479,7 @@
         if (e.code.startsWith('Digit')) {
           const n = Number(e.code.slice(5)) - 1;
           if (n >= 0 && n < 9) G.inventory.select(n);
-        } else if (e.code === 'KeyE' && !e.repeat) openInventory();
+        } else if (e.code === 'KeyE' && !e.repeat) openInventory('inv');
         else if (e.code === 'KeyT' && G.mp && !e.repeat) { e.preventDefault(); openChat(); }
         else if (e.code === 'Tab' && G.mp) OM.MpUI.showPlayers(true);
         else if (e.code === 'Enter' && !isLocked()) { G.lockFailures = 0; requestLock(); }
@@ -726,7 +738,7 @@
   function saveGame(silent) {
     if (!G.started) return false;
     if (G.mp) { // the world is on the server: keep only this player's inventory, per server + room
-      const ok = store.set(mpSaveKey(), JSON.stringify({ version: 1, seed: G.seed, savedAt: Date.now(), inventory: G.inventory.serialize() }));
+      const ok = store.set(mpSaveKey(), JSON.stringify({ version: 1, seed: G.seed, savedAt: Date.now(), inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize() }));
       if (!silent) toast(ok ? 'Inventory saved (the world lives on the server)' : 'Could not save — browser storage is unavailable or full');
       return ok;
     }
@@ -734,7 +746,7 @@
     const data = {
       version: 1, seed: G.seed, time: G.sky.time, savedAt: Date.now(),
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, health: P.health },
-      inventory: G.inventory.serialize(), world: G.world.serialize()
+      inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize(), world: G.world.serialize()
     };
     const ok = store.set(SAVE_KEY, JSON.stringify(data));
     if (ok) G.save = data;
@@ -888,7 +900,7 @@
     if (live) G.wildlife.update(dt, G.centerVec, G.sky.daylight, G.fog.color, G.fog.near, G.fog.far);
     G.water.updateUniforms(G.time, G.sky, G.fog.near, G.fog.far, G.fog.color);
     G.interaction.setHandLight(G.sky.daylight, G.sky.sun.color);
-    if (simulate) G.interaction.update(dt, G.input, st === 'playing');
+    if (simulate) { G.interaction.update(dt, G.input, st === 'playing'); OM.Furnaces.update(Math.min(dt, 0.25)); G.inventory.update(); }
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);

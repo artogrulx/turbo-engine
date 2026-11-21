@@ -202,6 +202,7 @@
     ore(x, y, z) {
       const s = this.seed;
       if (y < 64 && N.hash3(x >> 1, y >> 1, z >> 1, s + 301) < 0.018 && N.hash3(x, y, z, s + 302) < 0.65) return B.COAL_ORE;
+      if (y < 22 && N.hash3(x >> 1, y >> 1, z >> 1, s + 305) < 0.0045 && N.hash3(x, y, z, s + 306) < 0.6) return B.DIAMOND_ORE;   // rare, deep
       if (y < 44 && N.hash3(x >> 1, y >> 1, z >> 1, s + 303) < 0.009 && N.hash3(x, y, z, s + 304) < 0.6) return B.IRON_ORE;
       return B.STONE;
     }
