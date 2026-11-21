@@ -8,7 +8,7 @@
   const OM = window.OM;
   const { CY, VOL } = OM.CONST;
   const BL = OM.Blocks, B = OM.B;
-  const SOLID = BL.SOLID, OPAQUE = BL.OPAQUE;
+  const SOLID = BL.SOLID, OPAQUE = BL.OPAQUE, LIQUID = BL.LIQUID;
 
   const key = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
@@ -93,8 +93,8 @@
       if (!c || !c.generated) return -1;
       return c.blocks[(x & 15) + ((z & 15) << 4) + (y << 8)];
     }
-    /** Unloaded terrain counts as solid so nothing can fall into it. */
-    isSolid(x, y, z) { const b = this.getBlock(x, y, z); return b < 0 ? true : SOLID[b] === 1; }
+    /** Unloaded terrain counts as solid so nothing can fall into it. Liquids (lava) are blocks that bodies can enter. */
+    isSolid(x, y, z) { const b = this.getBlock(x, y, z); return b < 0 ? true : SOLID[b] === 1 && LIQUID[b] === 0; }
     getWater(x, y, z) {
       if (y < 0 || y >= CY) return 0;
       const c = this.chunkAt(x, z);

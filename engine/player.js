@@ -8,6 +8,7 @@
   'use strict';
   const OM = window.OM;
   const G = 32, JUMP_V = 8.9, EPS = 1e-4;
+  const LAVA = OM.B.LAVA;
 
   class Player {
     constructor(world) {
@@ -19,6 +20,7 @@
       this.width = 0.6; this.height = 1.8; this.eye = 1.62;
       this.onGround = false; this.wasOnGround = false;
       this.submerged = 0; this.inWater = false; this.headUnder = false;
+      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;   // lava and the fire it leaves on you
       this.sneaking = false; this.sprinting = false; this.collidedH = false; this.hitAxis = false;
       this.health = 20; this.maxHealth = 20; this.air = 15; this.maxAir = 15;
       this.fallStart = null; this.lastDamage = -100; this.regenTimer = 0; this.drownTimer = 0;
@@ -33,7 +35,16 @@
       this.pos.set(x, y, z); this.prev.copy(this.pos); this.vel.set(0, 0, 0);
       this.fallStart = null; this.onGround = false; this.dead = false;
     }
-    resetVitals() { this.health = this.maxHealth; this.air = this.maxAir; this.drownTimer = 0; this.regenTimer = 0; }
+    resetVitals() { this.health = this.maxHealth; this.air = this.maxAir; this.drownTimer = 0; this.regenTimer = 0; this.burning = 0; this.lavaTimer = 0; this.inLava = false; this.lavaHead = false; }
+    /** True when any part of the body box overlaps a block of this id. */
+    touches(id) {
+      const p = this.pos, hw = this.width / 2, W = this.world;
+      for (let by = Math.floor(p.y + EPS); by <= Math.floor(p.y + this.height - EPS); by++)
+        for (let bz = Math.floor(p.z - hw + EPS); bz <= Math.floor(p.z + hw - EPS); bz++)
+          for (let bx = Math.floor(p.x - hw + EPS); bx <= Math.floor(p.x + hw - EPS); bx++)
+            if (W.getBlock(bx, by, bz) === id) return true;
+      return false;
+    }
 
     look(dx, dy, sens, invert) {
       this.yaw -= dx * sens;
@@ -124,6 +135,8 @@
       const wasInWater = this.inWater;
       this.inWater = this.submerged > 0.02;
       if (this.inWater && !wasInWater && this.vel.y < -4 && this.onSplash) this.onSplash(-this.vel.y);
+      this.inLava = this.touches(LAVA);
+      this.lavaHead = this.inLava && W.getBlock(Math.floor(p.x), Math.floor(p.y + this.eye), Math.floor(p.z)) === LAVA;
 
       // stance
       const wantSneak = inp.sneak && !this.inWater;
@@ -145,7 +158,15 @@
       const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
       const wx = -s * fz + c * fx, wz = -c * fz - s * fx;
 
-      if (this.inWater) {
+      if (this.inLava) {                                   // thick, heavy and deadly: slow wading, you sink slowly, Space claws upward
+        const k = 1 - Math.exp(-3 * dt);
+        this.vel.x += (wx * 1.7 - this.vel.x) * k;
+        this.vel.z += (wz * 1.7 - this.vel.z) * k;
+        this.vel.y += (-G * 0.12 + (inp.jump ? 22 : 0)) * dt;
+        this.vel.y *= Math.exp(-3.4 * dt);
+        if (inp.jump && this.collidedH) this.vel.y = Math.max(this.vel.y, 5.2);
+        this.fallStart = null;
+      } else if (this.inWater) {
         const speed = this.sprinting ? 3.9 : 2.5;
         const k = 1 - Math.exp(-4 * dt);
         this.vel.x += (wx * speed - this.vel.x) * k;
@@ -204,7 +225,7 @@
         if (this.vel.y > 0) this.fallStart = null;
         else if (this.fallStart === null) this.fallStart = p.y;
       }
-      if (this.onGround && !this.wasOnGround) {
+      if (this.onGround && !this.wasOnGround && !this.inLava) {
         let dist = 0;
         if (this.fallStart !== null) {
           dist = this.fallStart - p.y;
@@ -222,6 +243,19 @@
           if (this.drownTimer >= 1) { this.drownTimer = 0; this.damage(2, 'drown'); }
         }
       } else { this.air = Math.min(this.maxAir, this.air + dt * 4); this.drownTimer = 0; }
+      // ---- lava burns hard, and sets you alight until you reach water ----
+      if (this.inLava) {
+        this.burning = 8;
+        this.lavaTimer -= dt;
+        if (this.lavaTimer <= 0) { this.lavaTimer += 0.45; this.damage(3, 'lava'); }
+      } else this.lavaTimer = 0;
+      if (this.burning > 0) {
+        if (this.inWater) this.burning = 0;
+        else {
+          this.burning -= dt; this.burnTimer += dt;
+          if (this.burnTimer >= 1) { this.burnTimer = 0; this.damage(1, 'fire'); }
+        }
+      } else this.burnTimer = 0;
       if (this.health < this.maxHealth && this.time - this.lastDamage > 5) {
         this.regenTimer += dt;
         if (this.regenTimer > 2.5) { this.regenTimer = 0; this.health = Math.min(this.maxHealth, this.health + 1); }

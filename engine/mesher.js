@@ -12,7 +12,7 @@
   const OM = window.OM;
   const { CY } = OM.CONST;
   const BL = OM.Blocks, B = OM.B;
-  const OPAQUE = BL.OPAQUE, CUTOUT = BL.CUTOUT, AO_OCC = BL.AO_OCC, TINT = BL.TINT, TILE = BL.TILE;
+  const OPAQUE = BL.OPAQUE, CUTOUT = BL.CUTOUT, AO_OCC = BL.AO_OCC, TINT = BL.TINT, TILE = BL.TILE, GLOW = BL.GLOW;
 
   const PW = 18, PA = PW * PW, PH = CY + 2;
   const pad = new Uint8Array(PA * PH);
@@ -177,8 +177,9 @@
           if ((tmode === 1 && f === 2) || tmode === 2) { r = tr; gg = tg; b = tb; }
           const tile = TILE[id * 6 + f];
           const u0 = uvTable[tile * 4], v0 = uvTable[tile * 4 + 1], u1 = uvTable[tile * 4 + 2], v1 = uvTable[tile * 4 + 3];
-          // 255 = underwater face (caustics), 128 = foliage (wind sway), 0 = plain
-          const wet = padW[np] ? 255 : tmode === 2 ? 128 : 0;
+          // 255 = underwater face (caustics), 128 = foliage (wind sway), 64 = glowing (lava), 0 = plain
+          const glow = GLOW[id] === 1;
+          const wet = glow ? 64 : padW[np] ? 255 : tmode === 2 ? 128 : 0;
           g.ensure(4);
           const base = g.v;
           for (let k = 0; k < 4; k++) {
@@ -187,7 +188,7 @@
             g.nor[vi * 3] = F.n[0] * 127; g.nor[vi * 3 + 1] = F.n[1] * 127; g.nor[vi * 3 + 2] = F.n[2] * 127;
             g.uv[vi * 2] = u0 + (u1 - u0) * F.uvs[k][0];
             g.uv[vi * 2 + 1] = v0 + (v1 - v0) * F.uvs[k][1];
-            const L = li[k] * 255;
+            const L = glow ? 255 : li[k] * 255;
             g.col[vi * 3] = Math.min(255, L * r); g.col[vi * 3 + 1] = Math.min(255, L * gg); g.col[vi * 3 + 2] = Math.min(255, L * b);
             g.wet[vi] = wet;
           }

@@ -16,7 +16,7 @@
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -29,7 +29,7 @@
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
     BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
-    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -69,18 +69,24 @@
   def(B.CRAFTING_TABLE, 'crafting_table', 'Crafting Table', { hardness: 0.9, tiles: [T.crafting_table_top, T.planks, T.crafting_table_side], sound: 'wood', color: [150, 112, 66] });
   def(B.FURNACE, 'furnace', 'Furnace', { hardness: 1.6, tiles: [T.furnace_top, T.furnace_top, T.furnace_side], color: [110, 110, 112] });
   def(B.DIAMOND_ORE, 'diamond_ore', 'Diamond Ore', { hardness: 2.6, tiles: [T.diamond_ore, T.diamond_ore, T.diamond_ore], color: [90, 150, 160] });
+  // Lava is a still, glowing liquid block: it blocks water like stone does, but the player sinks into it (liquid) and burns.
+  def(B.LAVA, 'lava', 'Lava', { hardness: Infinity, tiles: [T.lava, T.lava, T.lava], drop: 0, liquid: true, glow: true, color: [236, 110, 30] });
+  def(B.OBSIDIAN, 'obsidian', 'Obsidian', { hardness: 14, tiles: [T.obsidian, T.obsidian, T.obsidian], color: [34, 24, 54] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
   const AO_OCC = new Uint8Array(256), TINT = new Uint8Array(256), SUPPORTS_PLANT = new Uint8Array(256);
   const HARD = new Float32Array(256), TILE = new Int16Array(256 * 6);
+  const LIQUID = new Uint8Array(256), GLOW = new Uint8Array(256);   // liquids can be walked into; glowing faces ignore shade and stay lit at night
   const TOOL = new Uint8Array(256), LEVEL = new Uint8Array(256);   // preferred tool kind (1 pickaxe, 2 axe, 3 shovel) and the tool tier needed for a drop; filled in by crafting.js
   for (const d of defs) {
     if (!d) continue;
     SOLID[d.id] = d.solid ? 1 : 0;
     OPAQUE[d.id] = d.opaque ? 1 : 0;
     CUTOUT[d.id] = d.cutout ? 1 : 0;
-    AO_OCC[d.id] = d.solid && (d.opaque || d.tint === 2) ? 1 : 0; // leaves also shade
+    AO_OCC[d.id] = d.solid && !d.liquid && (d.opaque || d.tint === 2) ? 1 : 0; // leaves also shade
+    LIQUID[d.id] = d.liquid ? 1 : 0;
+    GLOW[d.id] = d.glow ? 1 : 0;
     TINT[d.id] = d.tint;
     HARD[d.id] = d.hardness;
     for (let f = 0; f < 6; f++) TILE[d.id * 6 + f] = f === 2 ? d.tiles[0] : f === 3 ? d.tiles[1] : d.tiles[2];
@@ -90,7 +96,7 @@
   OM.TILES = TILES;
   OM.T = T;
   OM.B = B;
-  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL };
+  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL, LIQUID, GLOW };
 
   // ---------------------------------------------------------------------------
   // Plants (decorations that live on top of soil blocks; no collision)
@@ -154,7 +160,7 @@
   const I = { BUCKET: 200, WATER_BUCKET: 201 };
   const itemDefs = [];
   for (const d of defs) {
-    if (!d || d.id === B.AIR) continue;
+    if (!d || d.id === B.AIR || d.liquid) continue;   // lava cannot be carried
     itemDefs[d.id] = { id: d.id, name: d.name, kind: 'block', block: d.id, max: 64, icon: null };
   }
   for (const d of plantDefs) {

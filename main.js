@@ -149,16 +149,22 @@
         shader.uniforms.uTime = common.uTime;
         shader.uniforms.uCaustics = common.uCaustics;
         shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aWet;\nuniform float uTime;\nvarying float vWet;\nvarying vec3 vOmWorld;')
+          .replace('#include <common>', '#include <common>\nattribute float aWet;\nuniform float uTime;\nvarying float vWet;\nvarying float vGlow;\nvarying vec3 vOmWorld;')
           .replace('#include <begin_vertex>', `#include <begin_vertex>
             vec4 omWp = modelMatrix * vec4(transformed, 1.0);
             float omSway = step(0.4, aWet) * (1.0 - step(0.75, aWet));
             transformed.x += sin(uTime * 1.7 + omWp.x * 0.6 + omWp.y * 0.4) * 0.035 * omSway;
             transformed.z += cos(uTime * 1.3 + omWp.z * 0.5 + omWp.y * 0.3) * 0.03 * omSway;
             vWet = step(0.75, aWet);
+            vGlow = step(0.15, aWet) * (1.0 - step(0.4, aWet));
             vOmWorld = omWp.xyz;`);
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uCaustics;\nvarying float vWet;\nvarying vec3 vOmWorld;')
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uCaustics;\nvarying float vWet;\nvarying float vGlow;\nvarying vec3 vOmWorld;')
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+            if (vGlow > 0.5) {
+              float shimmer = 0.9 + 0.1 * sin(vOmWorld.x * 3.1 + uTime * 1.3) * sin(vOmWorld.z * 2.7 - uTime * 0.9) + 0.05 * sin(uTime * 2.1 + vOmWorld.y * 5.0);
+              totalEmissiveRadiance += diffuseColor.rgb * shimmer * 0.95;
+            }`)
           .replace('#include <fog_fragment>', `if (vWet > 0.5) {
               vec2 cp = vOmWorld.xz * 0.9 + vOmWorld.y * 0.3;
               float c1 = sin(cp.x * 2.1 + uTime * 1.3) * sin(cp.y * 2.3 - uTime * 1.1);
@@ -168,7 +174,7 @@
             }
             #include <fog_fragment>`);
       };
-      m.customProgramCacheKey = () => (cutout ? 'om-terrain-cutout-v1' : 'om-terrain-v1');
+      m.customProgramCacheKey = () => (cutout ? 'om-terrain-cutout-v2' : 'om-terrain-v2');
       return m;
     };
     return { opaque: make(false), cutout: make(true), water: null, common };
@@ -295,7 +301,10 @@
       if (cause === 'drown') toast('You are running out of air!', 1200);
     };
     P.onDeath = (cause) => {
-      const msg = { fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.' }[cause] || 'You blacked out.';
+      const msg = {
+        fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.',
+        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.'
+      }[cause] || 'You blacked out.';
       $('death-reason').textContent = msg;
       if (cause === 'void') { respawn(); toast('You fell out of the world — back to the meadow.'); return; }
       setState('dead');
@@ -904,6 +913,8 @@
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);
+    $('lava-overlay').style.opacity = P.lavaHead ? '0.94' : '0';
+    $('fire-overlay').style.opacity = P.burning > 0 && !P.dead ? (0.55 + 0.25 * Math.sin(G.time * 11)).toFixed(2) : '0';
 
     G.frames++; G.fpsTime += dt;
     if (G.fpsTime >= 0.5) { G.fps = Math.round(G.frames / G.fpsTime); G.frames = 0; G.fpsTime = 0; }

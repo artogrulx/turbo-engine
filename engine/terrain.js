@@ -14,6 +14,7 @@
   const WATER_SOURCE = 16 | 8;
   const FORCE = 256; // stamp flag: may replace terrain (used by boulders)
   const TREE_CELL = 5, BUSH_CELL = 7, ROCK_CELL = 11, SPRING_CELL = 48;
+  const LAVA_CELL = 52, LAVA_CHANCE = 0.4;   // one candidate lava lake per 52x52 blocks, 40% of which are kept
   const isLeaves = (id) => id === B.OAK_LEAVES || id === B.BIRCH_LEAVES || id === B.SPRUCE_LEAVES;
 
   const PALETTES = [
@@ -122,6 +123,7 @@
       this.nPalette = new S(s ^ 0xd00d);
       this.col = { h: 0, river: 0, forest: 0, hill: 0 };
       this.cache = new Map();
+      this.lavaCache = new Map();
       this.hm = new Int16Array(18 * 18);
       this.riv = new Float32Array(18 * 18);
       this.fr = new Float32Array(18 * 18);
@@ -201,10 +203,61 @@
 
     ore(x, y, z) {
       const s = this.seed;
+      if (y < 14) {                                         // buried lava pockets: only found by digging down
+        const cx = x >> 3, cy = y >> 3, cz = z >> 3;
+        if (N.hash3(cx, cy, cz, s + 307) < 0.09) {
+          const px = cx * 8 + 2 + N.hash3(cx, cy, cz, s + 308) * 4, py = cy * 8 + 2 + N.hash3(cx, cy, cz, s + 309) * 4, pz = cz * 8 + 2 + N.hash3(cx, cy, cz, s + 310) * 4;
+          const dx = x + 0.5 - px, dy = y + 0.5 - py, dz = z + 0.5 - pz;
+          if (dx * dx + dy * dy * 1.6 + dz * dz < 4.2) return B.LAVA;
+        }
+      }
       if (y < 64 && N.hash3(x >> 1, y >> 1, z >> 1, s + 301) < 0.018 && N.hash3(x, y, z, s + 302) < 0.65) return B.COAL_ORE;
       if (y < 22 && N.hash3(x >> 1, y >> 1, z >> 1, s + 305) < 0.0045 && N.hash3(x, y, z, s + 306) < 0.6) return B.DIAMOND_ORE;   // rare, deep
       if (y < 44 && N.hash3(x >> 1, y >> 1, z >> 1, s + 303) < 0.009 && N.hash3(x, y, z, s + 304) < 0.6) return B.IRON_ORE;
       return B.STONE;
+    }
+
+    /** Surface lava lakes: at most one candidate per LAVA_CELL square, kept only on flat dry land well above the sea. */
+    lavaPool(gx, gz) {
+      const key = (gx + 2000000) * 4000003 + gz + 2000000;
+      const known = this.lavaCache.get(key);
+      if (known !== undefined) return known;
+      if (this.lavaCache.size > 3000) this.lavaCache.clear();
+      let res = null;
+      const s = this.seed;
+      if (N.hash2(gx, gz, s + 701) < LAVA_CHANCE) {
+        const x = gx * LAVA_CELL + 9 + Math.floor(N.hash2(gx, gz, s + 702) * (LAVA_CELL - 18));
+        const z = gz * LAVA_CELL + 9 + Math.floor(N.hash2(gx, gz, s + 703) * (LAVA_CELL - 18));
+        const r = 3.3 + N.hash2(gx, gz, s + 704) * 2.5;
+        const c = this.sample(x, z), h = Math.floor(c.h);
+        let ok = h > SEA + 3 && h < 84 && c.river < 0.25;
+        for (let a = 0; ok && a < 8; a++) {
+          const ang = (a * Math.PI) / 4;
+          if (Math.abs(Math.floor(this.sample(x + Math.cos(ang) * (r + 2), z + Math.sin(ang) * (r + 2)).h) - h) > 1) ok = false;
+        }
+        if (ok) {
+          const out = [], R = Math.ceil(r);
+          for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+            const d2 = dx * dx + dz * dz;
+            if (d2 > r * r) continue;
+            const wx = x + dx, wz = z + dz, g = Math.floor(this.sample(wx, wz).h), depth = d2 < r * r * 0.3 ? 3 : 2;
+            for (let y = h - depth + 1; y <= h; y++) out.push(wx, y, wz, B.LAVA | FORCE);   // the surface is flush with the ground at the centre
+            for (let y = h + 1; y <= Math.max(g, h) + 14; y++) out.push(wx, y, wz, FORCE);   // clears ledges, trunks and canopies above it
+          }
+          res = { x, z, h, r, blocks: out };
+        }
+      }
+      this.lavaCache.set(key, res);
+      return res;
+    }
+    /** The nearest lava lake within `range` blocks of (x, z), or null (used to keep the spawn point safe). */
+    lavaNear(x, z, range) {
+      for (let gz = Math.floor((z - range) / LAVA_CELL); gz <= Math.floor((z + range) / LAVA_CELL); gz++)
+        for (let gx = Math.floor((x - range) / LAVA_CELL); gx <= Math.floor((x + range) / LAVA_CELL); gx++) {
+          const p = this.lavaPool(gx, gz);
+          if (p && Math.hypot(p.x - x, p.z - z) < range + p.r) return p;
+        }
+      return null;
     }
 
     // ----- structures (cached because neighbouring chunks share them) -----
@@ -271,6 +324,13 @@
           const st = this.structure(kind, gx, gz);
           if (st) this.stamp(ch, st.blocks);
         }
+      }
+      // lava lakes go in last so they clear whatever grew over them
+      const gx0 = Math.floor((ch.x0 - 8) / LAVA_CELL), gx1 = Math.floor((ch.x0 + 15 + 8) / LAVA_CELL);
+      const gz0 = Math.floor((ch.z0 - 8) / LAVA_CELL), gz1 = Math.floor((ch.z0 + 15 + 8) / LAVA_CELL);
+      for (let gz = gz0; gz <= gz1; gz++) for (let gx = gx0; gx <= gx1; gx++) {
+        const pool = this.lavaPool(gx, gz);
+        if (pool) this.stamp(ch, pool.blocks);
       }
     }
 
@@ -394,6 +454,7 @@
       const c = this.sample(x, z);
       const h = Math.floor(c.h), forest = c.forest, river = c.river, hill = c.hill;
       if (h <= SEA + 2 || h > SEA + 30 || forest > 0.12 || river > 0) return -100;
+      if (this.lavaNear(x, z, 16)) return -60;                 // never start beside a lava lake
       let maxd = 0;
       const probes = [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, -2], [2, -2], [-2, 2]];
       for (const [dx, dz] of probes) maxd = Math.max(maxd, Math.abs(Math.floor(this.sample(x + dx, z + dz).h) - h));

@@ -294,6 +294,28 @@
     }
   }
 
+  function pLava(t) {
+    const a = t.lattice(4), b = t.lattice(8), c = t.lattice(16);
+    t.each((x, y) => {
+      const v = a(x, y) * 0.5 + b(x, y) * 0.32 + c(x, y) * 0.18;
+      let col = v < 0.38 ? mix([96, 26, 10], [196, 58, 12], v / 0.38) : mix([226, 92, 14], [255, 214, 70], Math.min(1, (v - 0.38) / 0.4));
+      if (t.r() < 0.04) col = mul(col, 1.18);
+      return jit(t, col, 0.05);
+    });
+  }
+  function pObsidian(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => {
+      const v = n(x, y) * 0.6 + m(x, y) * 0.4;
+      return jit(t, mix([16, 10, 30], [52, 34, 84], v), 0.1);
+    });
+    for (let i = 0; i < 9; i++) {                      // glassy streaks
+      let x = t.r() * 32, y = t.r() * 32;
+      const dx = t.r() < 0.5 ? 1 : -1;
+      for (let k = 0; k < 6 + t.r() * 8; k++) { t.set(x, y, [112, 82, 172]); t.set(x + 1, y, [64, 44, 108]); x += dx; y += 0.7; }
+    }
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -321,7 +343,8 @@
     bedrock: pBedrock, snow: pSnow, snow_side: pSnowSide, stone_bricks: pStoneBricks,
     birch_planks: (t) => pPlanks(t, [206, 186, 134]),
     crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
-    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre
+    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre,
+    lava: pLava, obsidian: pObsidian
   };
 
   function buildBlockAtlas() {

@@ -198,7 +198,11 @@
         tx = hit.x + hit.nx; ty = hit.y + hit.ny; tz = hit.z + hit.nz;
       }
       if (ty < 1 || ty >= OM.CONST.CY - 1) return;
-      if (W.getBlock(tx, ty, tz) !== 0) return; // occupied (or not loaded)
+      const here = W.getBlock(tx, ty, tz);
+      if (here === OM.B.LAVA && (item.kind === 'block' || item.kind === 'water_bucket')) {
+        // pouring water on lava, or building into it, is allowed: water turns the lava to obsidian, a block simply replaces it
+        if (item.kind === 'water_bucket') { this.pourOnLava(tx, ty, tz); return; }
+      } else if (here !== 0) return; // occupied (or not loaded)
       if (item.kind === 'block') {
         if (this.player.intersectsBlock(tx, ty, tz)) return;
         if (this.remote && this.remote.intersectsBlock(tx, ty, tz)) return; // never wall in another player
@@ -222,7 +226,35 @@
           this.inventory.setSelected(I.BUCKET, 1);
           this.swing(false);
           if (this.audio) this.audio.play('splash', 'small');
+          this.quenchLavaAround(tx, ty, tz);                  // water that touches lava hardens it
         }
+      }
+    }
+
+    /** Lava cools to obsidian where water touches it. Returns how many blocks changed. */
+    quenchLavaAround(x, y, z) {
+      const W = this.world;
+      let n = 0;
+      for (const [dx, dy, dz] of [[0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) {
+        if (W.getBlock(x + dx, y + dy, z + dz) !== OM.B.LAVA) continue;
+        if (W.setBlock(x + dx, y + dy, z + dz, OM.B.OBSIDIAN)) {
+          if (this.net) this.net.sendBlock(x + dx, y + dy, z + dz, OM.B.OBSIDIAN);
+          this.burst(x + dx + 0.5, y + dy + 0.8, z + dz + 0.5, [200, 200, 210], 6, 0.7);   // steam
+          n++;
+        }
+      }
+      if (n && this.audio) this.audio.play('splash', 'small');
+      return n;
+    }
+    /** A water bucket emptied straight onto a lava block: that block and the lava around it become obsidian. */
+    pourOnLava(x, y, z) {
+      const W = this.world;
+      if (W.setBlock(x, y, z, OM.B.OBSIDIAN)) {
+        if (this.net) this.net.sendBlock(x, y, z, OM.B.OBSIDIAN);
+        this.quenchLavaAround(x, y, z);
+        this.inventory.setSelected(I.BUCKET, 1);
+        this.swing(false);
+        if (this.audio) this.audio.play('splash', 'small');
       }
     }
 

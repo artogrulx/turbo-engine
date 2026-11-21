@@ -51,6 +51,14 @@ body.in-game #game-canvas { cursor: none; }
     radial-gradient(ellipse at 50% 35%, rgba(70, 170, 190, 0.05) 0%, rgba(10, 70, 90, 0.35) 70%, rgba(4, 30, 44, 0.75) 100%),
     linear-gradient(180deg, rgba(120, 210, 230, 0.12), rgba(10, 50, 70, 0.25));
 }
+#lava-overlay {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 2;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 170, 40, 0.75) 0%, rgba(230, 70, 10, 0.9) 60%, rgba(120, 20, 0, 0.97) 100%);
+}
+#fire-overlay {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 2; transition: opacity 0.25s;
+  background: linear-gradient(0deg, rgba(255, 140, 20, 0.6) 0%, rgba(255, 90, 10, 0.25) 22%, rgba(255, 90, 10, 0) 45%);
+}
 #damage-overlay {
   position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 3;
   background: radial-gradient(ellipse at center, rgba(200, 20, 10, 0) 45%, rgba(200, 20, 10, 0.55) 100%);
@@ -389,6 +397,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   <!-- 3D view -->
   <div id="canvas-host"></div>
   <div id="underwater-overlay"></div>
+  <div id="lava-overlay"></div>
+  <div id="fire-overlay"></div>
   <div id="damage-overlay"></div>
 
   <!-- In-game HUD (never receives clicks) -->
@@ -823,7 +833,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -836,7 +846,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
     BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
-    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -876,18 +886,24 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   def(B.CRAFTING_TABLE, 'crafting_table', 'Crafting Table', { hardness: 0.9, tiles: [T.crafting_table_top, T.planks, T.crafting_table_side], sound: 'wood', color: [150, 112, 66] });
   def(B.FURNACE, 'furnace', 'Furnace', { hardness: 1.6, tiles: [T.furnace_top, T.furnace_top, T.furnace_side], color: [110, 110, 112] });
   def(B.DIAMOND_ORE, 'diamond_ore', 'Diamond Ore', { hardness: 2.6, tiles: [T.diamond_ore, T.diamond_ore, T.diamond_ore], color: [90, 150, 160] });
+  // Lava is a still, glowing liquid block: it blocks water like stone does, but the player sinks into it (liquid) and burns.
+  def(B.LAVA, 'lava', 'Lava', { hardness: Infinity, tiles: [T.lava, T.lava, T.lava], drop: 0, liquid: true, glow: true, color: [236, 110, 30] });
+  def(B.OBSIDIAN, 'obsidian', 'Obsidian', { hardness: 14, tiles: [T.obsidian, T.obsidian, T.obsidian], color: [34, 24, 54] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
   const AO_OCC = new Uint8Array(256), TINT = new Uint8Array(256), SUPPORTS_PLANT = new Uint8Array(256);
   const HARD = new Float32Array(256), TILE = new Int16Array(256 * 6);
+  const LIQUID = new Uint8Array(256), GLOW = new Uint8Array(256);   // liquids can be walked into; glowing faces ignore shade and stay lit at night
   const TOOL = new Uint8Array(256), LEVEL = new Uint8Array(256);   // preferred tool kind (1 pickaxe, 2 axe, 3 shovel) and the tool tier needed for a drop; filled in by crafting.js
   for (const d of defs) {
     if (!d) continue;
     SOLID[d.id] = d.solid ? 1 : 0;
     OPAQUE[d.id] = d.opaque ? 1 : 0;
     CUTOUT[d.id] = d.cutout ? 1 : 0;
-    AO_OCC[d.id] = d.solid && (d.opaque || d.tint === 2) ? 1 : 0; // leaves also shade
+    AO_OCC[d.id] = d.solid && !d.liquid && (d.opaque || d.tint === 2) ? 1 : 0; // leaves also shade
+    LIQUID[d.id] = d.liquid ? 1 : 0;
+    GLOW[d.id] = d.glow ? 1 : 0;
     TINT[d.id] = d.tint;
     HARD[d.id] = d.hardness;
     for (let f = 0; f < 6; f++) TILE[d.id * 6 + f] = f === 2 ? d.tiles[0] : f === 3 ? d.tiles[1] : d.tiles[2];
@@ -897,7 +913,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   OM.TILES = TILES;
   OM.T = T;
   OM.B = B;
-  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL };
+  OM.Blocks = { defs, SOLID, OPAQUE, CUTOUT, AO_OCC, TINT, HARD, TILE, SUPPORTS_PLANT, TOOL, LEVEL, LIQUID, GLOW };
 
   // ---------------------------------------------------------------------------
   // Plants (decorations that live on top of soil blocks; no collision)
@@ -961,7 +977,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const I = { BUCKET: 200, WATER_BUCKET: 201 };
   const itemDefs = [];
   for (const d of defs) {
-    if (!d || d.id === B.AIR) continue;
+    if (!d || d.id === B.AIR || d.liquid) continue;   // lava cannot be carried
     itemDefs[d.id] = { id: d.id, name: d.name, kind: 'block', block: d.id, max: 64, icon: null };
   }
   for (const d of plantDefs) {
@@ -1023,6 +1039,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   setTool([B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.BRICKS, B.STONE_BRICKS, B.COAL_ORE, B.FURNACE], 'pickaxe', 1);
   setTool([B.IRON_ORE], 'pickaxe', 2);
   setTool([B.DIAMOND_ORE], 'pickaxe', 3);
+  setTool([B.OBSIDIAN], 'pickaxe', 4);                          // only a diamond pickaxe can harvest obsidian
   setTool([B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG, B.PLANKS, B.BIRCH_PLANKS, B.CRAFTING_TABLE], 'axe', 0);
   setTool([B.DIRT, B.GRASS, B.SAND, B.GRAVEL, B.CLAY, B.SNOW], 'shovel', 0);
 
@@ -1471,6 +1488,28 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
   }
 
+  function pLava(t) {
+    const a = t.lattice(4), b = t.lattice(8), c = t.lattice(16);
+    t.each((x, y) => {
+      const v = a(x, y) * 0.5 + b(x, y) * 0.32 + c(x, y) * 0.18;
+      let col = v < 0.38 ? mix([96, 26, 10], [196, 58, 12], v / 0.38) : mix([226, 92, 14], [255, 214, 70], Math.min(1, (v - 0.38) / 0.4));
+      if (t.r() < 0.04) col = mul(col, 1.18);
+      return jit(t, col, 0.05);
+    });
+  }
+  function pObsidian(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => {
+      const v = n(x, y) * 0.6 + m(x, y) * 0.4;
+      return jit(t, mix([16, 10, 30], [52, 34, 84], v), 0.1);
+    });
+    for (let i = 0; i < 9; i++) {                      // glassy streaks
+      let x = t.r() * 32, y = t.r() * 32;
+      const dx = t.r() < 0.5 ? 1 : -1;
+      for (let k = 0; k < 6 + t.r() * 8; k++) { t.set(x, y, [112, 82, 172]); t.set(x + 1, y, [64, 44, 108]); x += dx; y += 0.7; }
+    }
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -1498,7 +1537,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     bedrock: pBedrock, snow: pSnow, snow_side: pSnowSide, stone_bricks: pStoneBricks,
     birch_planks: (t) => pPlanks(t, [206, 186, 134]),
     crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
-    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre
+    furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre,
+    lava: pLava, obsidian: pObsidian
   };
 
   function buildBlockAtlas() {
@@ -2056,6 +2096,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const WATER_SOURCE = 16 | 8;
   const FORCE = 256; // stamp flag: may replace terrain (used by boulders)
   const TREE_CELL = 5, BUSH_CELL = 7, ROCK_CELL = 11, SPRING_CELL = 48;
+  const LAVA_CELL = 52, LAVA_CHANCE = 0.4;   // one candidate lava lake per 52x52 blocks, 40% of which are kept
   const isLeaves = (id) => id === B.OAK_LEAVES || id === B.BIRCH_LEAVES || id === B.SPRUCE_LEAVES;
 
   const PALETTES = [
@@ -2164,6 +2205,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.nPalette = new S(s ^ 0xd00d);
       this.col = { h: 0, river: 0, forest: 0, hill: 0 };
       this.cache = new Map();
+      this.lavaCache = new Map();
       this.hm = new Int16Array(18 * 18);
       this.riv = new Float32Array(18 * 18);
       this.fr = new Float32Array(18 * 18);
@@ -2243,10 +2285,61 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
     ore(x, y, z) {
       const s = this.seed;
+      if (y < 14) {                                         // buried lava pockets: only found by digging down
+        const cx = x >> 3, cy = y >> 3, cz = z >> 3;
+        if (N.hash3(cx, cy, cz, s + 307) < 0.09) {
+          const px = cx * 8 + 2 + N.hash3(cx, cy, cz, s + 308) * 4, py = cy * 8 + 2 + N.hash3(cx, cy, cz, s + 309) * 4, pz = cz * 8 + 2 + N.hash3(cx, cy, cz, s + 310) * 4;
+          const dx = x + 0.5 - px, dy = y + 0.5 - py, dz = z + 0.5 - pz;
+          if (dx * dx + dy * dy * 1.6 + dz * dz < 4.2) return B.LAVA;
+        }
+      }
       if (y < 64 && N.hash3(x >> 1, y >> 1, z >> 1, s + 301) < 0.018 && N.hash3(x, y, z, s + 302) < 0.65) return B.COAL_ORE;
       if (y < 22 && N.hash3(x >> 1, y >> 1, z >> 1, s + 305) < 0.0045 && N.hash3(x, y, z, s + 306) < 0.6) return B.DIAMOND_ORE;   // rare, deep
       if (y < 44 && N.hash3(x >> 1, y >> 1, z >> 1, s + 303) < 0.009 && N.hash3(x, y, z, s + 304) < 0.6) return B.IRON_ORE;
       return B.STONE;
+    }
+
+    /** Surface lava lakes: at most one candidate per LAVA_CELL square, kept only on flat dry land well above the sea. */
+    lavaPool(gx, gz) {
+      const key = (gx + 2000000) * 4000003 + gz + 2000000;
+      const known = this.lavaCache.get(key);
+      if (known !== undefined) return known;
+      if (this.lavaCache.size > 3000) this.lavaCache.clear();
+      let res = null;
+      const s = this.seed;
+      if (N.hash2(gx, gz, s + 701) < LAVA_CHANCE) {
+        const x = gx * LAVA_CELL + 9 + Math.floor(N.hash2(gx, gz, s + 702) * (LAVA_CELL - 18));
+        const z = gz * LAVA_CELL + 9 + Math.floor(N.hash2(gx, gz, s + 703) * (LAVA_CELL - 18));
+        const r = 3.3 + N.hash2(gx, gz, s + 704) * 2.5;
+        const c = this.sample(x, z), h = Math.floor(c.h);
+        let ok = h > SEA + 3 && h < 84 && c.river < 0.25;
+        for (let a = 0; ok && a < 8; a++) {
+          const ang = (a * Math.PI) / 4;
+          if (Math.abs(Math.floor(this.sample(x + Math.cos(ang) * (r + 2), z + Math.sin(ang) * (r + 2)).h) - h) > 1) ok = false;
+        }
+        if (ok) {
+          const out = [], R = Math.ceil(r);
+          for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+            const d2 = dx * dx + dz * dz;
+            if (d2 > r * r) continue;
+            const wx = x + dx, wz = z + dz, g = Math.floor(this.sample(wx, wz).h), depth = d2 < r * r * 0.3 ? 3 : 2;
+            for (let y = h - depth + 1; y <= h; y++) out.push(wx, y, wz, B.LAVA | FORCE);   // the surface is flush with the ground at the centre
+            for (let y = h + 1; y <= Math.max(g, h) + 14; y++) out.push(wx, y, wz, FORCE);   // clears ledges, trunks and canopies above it
+          }
+          res = { x, z, h, r, blocks: out };
+        }
+      }
+      this.lavaCache.set(key, res);
+      return res;
+    }
+    /** The nearest lava lake within `range` blocks of (x, z), or null (used to keep the spawn point safe). */
+    lavaNear(x, z, range) {
+      for (let gz = Math.floor((z - range) / LAVA_CELL); gz <= Math.floor((z + range) / LAVA_CELL); gz++)
+        for (let gx = Math.floor((x - range) / LAVA_CELL); gx <= Math.floor((x + range) / LAVA_CELL); gx++) {
+          const p = this.lavaPool(gx, gz);
+          if (p && Math.hypot(p.x - x, p.z - z) < range + p.r) return p;
+        }
+      return null;
     }
 
     // ----- structures (cached because neighbouring chunks share them) -----
@@ -2313,6 +2406,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           const st = this.structure(kind, gx, gz);
           if (st) this.stamp(ch, st.blocks);
         }
+      }
+      // lava lakes go in last so they clear whatever grew over them
+      const gx0 = Math.floor((ch.x0 - 8) / LAVA_CELL), gx1 = Math.floor((ch.x0 + 15 + 8) / LAVA_CELL);
+      const gz0 = Math.floor((ch.z0 - 8) / LAVA_CELL), gz1 = Math.floor((ch.z0 + 15 + 8) / LAVA_CELL);
+      for (let gz = gz0; gz <= gz1; gz++) for (let gx = gx0; gx <= gx1; gx++) {
+        const pool = this.lavaPool(gx, gz);
+        if (pool) this.stamp(ch, pool.blocks);
       }
     }
 
@@ -2436,6 +2536,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const c = this.sample(x, z);
       const h = Math.floor(c.h), forest = c.forest, river = c.river, hill = c.hill;
       if (h <= SEA + 2 || h > SEA + 30 || forest > 0.12 || river > 0) return -100;
+      if (this.lavaNear(x, z, 16)) return -60;                 // never start beside a lava lake
       let maxd = 0;
       const probes = [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, -2], [2, -2], [-2, 2]];
       for (const [dx, dz] of probes) maxd = Math.max(maxd, Math.abs(Math.floor(this.sample(x + dx, z + dz).h) - h));
@@ -2489,7 +2590,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const OM = window.OM;
   const { CY } = OM.CONST;
   const BL = OM.Blocks, B = OM.B;
-  const OPAQUE = BL.OPAQUE, CUTOUT = BL.CUTOUT, AO_OCC = BL.AO_OCC, TINT = BL.TINT, TILE = BL.TILE;
+  const OPAQUE = BL.OPAQUE, CUTOUT = BL.CUTOUT, AO_OCC = BL.AO_OCC, TINT = BL.TINT, TILE = BL.TILE, GLOW = BL.GLOW;
 
   const PW = 18, PA = PW * PW, PH = CY + 2;
   const pad = new Uint8Array(PA * PH);
@@ -2654,8 +2755,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           if ((tmode === 1 && f === 2) || tmode === 2) { r = tr; gg = tg; b = tb; }
           const tile = TILE[id * 6 + f];
           const u0 = uvTable[tile * 4], v0 = uvTable[tile * 4 + 1], u1 = uvTable[tile * 4 + 2], v1 = uvTable[tile * 4 + 3];
-          // 255 = underwater face (caustics), 128 = foliage (wind sway), 0 = plain
-          const wet = padW[np] ? 255 : tmode === 2 ? 128 : 0;
+          // 255 = underwater face (caustics), 128 = foliage (wind sway), 64 = glowing (lava), 0 = plain
+          const glow = GLOW[id] === 1;
+          const wet = glow ? 64 : padW[np] ? 255 : tmode === 2 ? 128 : 0;
           g.ensure(4);
           const base = g.v;
           for (let k = 0; k < 4; k++) {
@@ -2664,7 +2766,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
             g.nor[vi * 3] = F.n[0] * 127; g.nor[vi * 3 + 1] = F.n[1] * 127; g.nor[vi * 3 + 2] = F.n[2] * 127;
             g.uv[vi * 2] = u0 + (u1 - u0) * F.uvs[k][0];
             g.uv[vi * 2 + 1] = v0 + (v1 - v0) * F.uvs[k][1];
-            const L = li[k] * 255;
+            const L = glow ? 255 : li[k] * 255;
             g.col[vi * 3] = Math.min(255, L * r); g.col[vi * 3 + 1] = Math.min(255, L * gg); g.col[vi * 3 + 2] = Math.min(255, L * b);
             g.wet[vi] = wet;
           }
@@ -2697,7 +2799,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const OM = window.OM;
   const { CY, VOL } = OM.CONST;
   const BL = OM.Blocks, B = OM.B;
-  const SOLID = BL.SOLID, OPAQUE = BL.OPAQUE;
+  const SOLID = BL.SOLID, OPAQUE = BL.OPAQUE, LIQUID = BL.LIQUID;
 
   const key = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
 
@@ -2782,8 +2884,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       if (!c || !c.generated) return -1;
       return c.blocks[(x & 15) + ((z & 15) << 4) + (y << 8)];
     }
-    /** Unloaded terrain counts as solid so nothing can fall into it. */
-    isSolid(x, y, z) { const b = this.getBlock(x, y, z); return b < 0 ? true : SOLID[b] === 1; }
+    /** Unloaded terrain counts as solid so nothing can fall into it. Liquids (lava) are blocks that bodies can enter. */
+    isSolid(x, y, z) { const b = this.getBlock(x, y, z); return b < 0 ? true : SOLID[b] === 1 && LIQUID[b] === 0; }
     getWater(x, y, z) {
       if (y < 0 || y >= CY) return 0;
       const c = this.chunkAt(x, z);
@@ -3272,6 +3374,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const OM = window.OM;
   const { CY } = OM.CONST;
   const SOLID = OM.Blocks.SOLID, OPAQUE = OM.Blocks.OPAQUE;
+  const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
   const LEVEL = 15, SOURCE = 16, FALLING = 32, FULL = 8;
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const OPP = [1, 0, 3, 2];
@@ -3430,7 +3533,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         // it spreads again on its next update, once its level is stable
         if (!(next & SOURCE) && strength(next) < strength(cur)) return;
       }
-      if (next > 0) this.spread(x, y, z, next);
+      if (next > 0) { this.quench(x, y, z); this.spread(x, y, z, next); }
+    }
+    /** Lava that water touches cools into obsidian (a river reaching a lava lake, a poured bucket...). */
+    quench(x, y, z) {
+      const W = this.world;
+      for (let d = 0; d < 6; d++) {
+        const nx = x + NEIGHBOURS[d][0], ny = y + NEIGHBOURS[d][1], nz = z + NEIGHBOURS[d][2];
+        if (W.getBlock(nx, ny, nz) === OM.B.LAVA) W.setBlock(nx, ny, nz, OM.B.OBSIDIAN);
+      }
     }
     canReceive(x, y, z, lvl) {
       const b = this.world.getBlock(x, y, z);
@@ -4613,6 +4724,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   'use strict';
   const OM = window.OM;
   const G = 32, JUMP_V = 8.9, EPS = 1e-4;
+  const LAVA = OM.B.LAVA;
 
   class Player {
     constructor(world) {
@@ -4624,6 +4736,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.width = 0.6; this.height = 1.8; this.eye = 1.62;
       this.onGround = false; this.wasOnGround = false;
       this.submerged = 0; this.inWater = false; this.headUnder = false;
+      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;   // lava and the fire it leaves on you
       this.sneaking = false; this.sprinting = false; this.collidedH = false; this.hitAxis = false;
       this.health = 20; this.maxHealth = 20; this.air = 15; this.maxAir = 15;
       this.fallStart = null; this.lastDamage = -100; this.regenTimer = 0; this.drownTimer = 0;
@@ -4638,7 +4751,16 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.pos.set(x, y, z); this.prev.copy(this.pos); this.vel.set(0, 0, 0);
       this.fallStart = null; this.onGround = false; this.dead = false;
     }
-    resetVitals() { this.health = this.maxHealth; this.air = this.maxAir; this.drownTimer = 0; this.regenTimer = 0; }
+    resetVitals() { this.health = this.maxHealth; this.air = this.maxAir; this.drownTimer = 0; this.regenTimer = 0; this.burning = 0; this.lavaTimer = 0; this.inLava = false; this.lavaHead = false; }
+    /** True when any part of the body box overlaps a block of this id. */
+    touches(id) {
+      const p = this.pos, hw = this.width / 2, W = this.world;
+      for (let by = Math.floor(p.y + EPS); by <= Math.floor(p.y + this.height - EPS); by++)
+        for (let bz = Math.floor(p.z - hw + EPS); bz <= Math.floor(p.z + hw - EPS); bz++)
+          for (let bx = Math.floor(p.x - hw + EPS); bx <= Math.floor(p.x + hw - EPS); bx++)
+            if (W.getBlock(bx, by, bz) === id) return true;
+      return false;
+    }
 
     look(dx, dy, sens, invert) {
       this.yaw -= dx * sens;
@@ -4729,6 +4851,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const wasInWater = this.inWater;
       this.inWater = this.submerged > 0.02;
       if (this.inWater && !wasInWater && this.vel.y < -4 && this.onSplash) this.onSplash(-this.vel.y);
+      this.inLava = this.touches(LAVA);
+      this.lavaHead = this.inLava && W.getBlock(Math.floor(p.x), Math.floor(p.y + this.eye), Math.floor(p.z)) === LAVA;
 
       // stance
       const wantSneak = inp.sneak && !this.inWater;
@@ -4750,7 +4874,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
       const wx = -s * fz + c * fx, wz = -c * fz - s * fx;
 
-      if (this.inWater) {
+      if (this.inLava) {                                   // thick, heavy and deadly: slow wading, you sink slowly, Space claws upward
+        const k = 1 - Math.exp(-3 * dt);
+        this.vel.x += (wx * 1.7 - this.vel.x) * k;
+        this.vel.z += (wz * 1.7 - this.vel.z) * k;
+        this.vel.y += (-G * 0.12 + (inp.jump ? 22 : 0)) * dt;
+        this.vel.y *= Math.exp(-3.4 * dt);
+        if (inp.jump && this.collidedH) this.vel.y = Math.max(this.vel.y, 5.2);
+        this.fallStart = null;
+      } else if (this.inWater) {
         const speed = this.sprinting ? 3.9 : 2.5;
         const k = 1 - Math.exp(-4 * dt);
         this.vel.x += (wx * speed - this.vel.x) * k;
@@ -4809,7 +4941,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         if (this.vel.y > 0) this.fallStart = null;
         else if (this.fallStart === null) this.fallStart = p.y;
       }
-      if (this.onGround && !this.wasOnGround) {
+      if (this.onGround && !this.wasOnGround && !this.inLava) {
         let dist = 0;
         if (this.fallStart !== null) {
           dist = this.fallStart - p.y;
@@ -4827,6 +4959,19 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           if (this.drownTimer >= 1) { this.drownTimer = 0; this.damage(2, 'drown'); }
         }
       } else { this.air = Math.min(this.maxAir, this.air + dt * 4); this.drownTimer = 0; }
+      // ---- lava burns hard, and sets you alight until you reach water ----
+      if (this.inLava) {
+        this.burning = 8;
+        this.lavaTimer -= dt;
+        if (this.lavaTimer <= 0) { this.lavaTimer += 0.45; this.damage(3, 'lava'); }
+      } else this.lavaTimer = 0;
+      if (this.burning > 0) {
+        if (this.inWater) this.burning = 0;
+        else {
+          this.burning -= dt; this.burnTimer += dt;
+          if (this.burnTimer >= 1) { this.burnTimer = 0; this.damage(1, 'fire'); }
+        }
+      } else this.burnTimer = 0;
       if (this.health < this.maxHealth && this.time - this.lastDamage > 5) {
         this.regenTimer += dt;
         if (this.regenTimer > 2.5) { this.regenTimer = 0; this.health = Math.min(this.maxHealth, this.health + 1); }
@@ -5067,7 +5212,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         tx = hit.x + hit.nx; ty = hit.y + hit.ny; tz = hit.z + hit.nz;
       }
       if (ty < 1 || ty >= OM.CONST.CY - 1) return;
-      if (W.getBlock(tx, ty, tz) !== 0) return; // occupied (or not loaded)
+      const here = W.getBlock(tx, ty, tz);
+      if (here === OM.B.LAVA && (item.kind === 'block' || item.kind === 'water_bucket')) {
+        // pouring water on lava, or building into it, is allowed: water turns the lava to obsidian, a block simply replaces it
+        if (item.kind === 'water_bucket') { this.pourOnLava(tx, ty, tz); return; }
+      } else if (here !== 0) return; // occupied (or not loaded)
       if (item.kind === 'block') {
         if (this.player.intersectsBlock(tx, ty, tz)) return;
         if (this.remote && this.remote.intersectsBlock(tx, ty, tz)) return; // never wall in another player
@@ -5091,7 +5240,35 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           this.inventory.setSelected(I.BUCKET, 1);
           this.swing(false);
           if (this.audio) this.audio.play('splash', 'small');
+          this.quenchLavaAround(tx, ty, tz);                  // water that touches lava hardens it
         }
+      }
+    }
+
+    /** Lava cools to obsidian where water touches it. Returns how many blocks changed. */
+    quenchLavaAround(x, y, z) {
+      const W = this.world;
+      let n = 0;
+      for (const [dx, dy, dz] of [[0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) {
+        if (W.getBlock(x + dx, y + dy, z + dz) !== OM.B.LAVA) continue;
+        if (W.setBlock(x + dx, y + dy, z + dz, OM.B.OBSIDIAN)) {
+          if (this.net) this.net.sendBlock(x + dx, y + dy, z + dz, OM.B.OBSIDIAN);
+          this.burst(x + dx + 0.5, y + dy + 0.8, z + dz + 0.5, [200, 200, 210], 6, 0.7);   // steam
+          n++;
+        }
+      }
+      if (n && this.audio) this.audio.play('splash', 'small');
+      return n;
+    }
+    /** A water bucket emptied straight onto a lava block: that block and the lava around it become obsidian. */
+    pourOnLava(x, y, z) {
+      const W = this.world;
+      if (W.setBlock(x, y, z, OM.B.OBSIDIAN)) {
+        if (this.net) this.net.sendBlock(x, y, z, OM.B.OBSIDIAN);
+        this.quenchLavaAround(x, y, z);
+        this.inventory.setSelected(I.BUCKET, 1);
+        this.swing(false);
+        if (this.audio) this.audio.play('splash', 'small');
       }
     }
 
@@ -6682,16 +6859,22 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         shader.uniforms.uTime = common.uTime;
         shader.uniforms.uCaustics = common.uCaustics;
         shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aWet;\nuniform float uTime;\nvarying float vWet;\nvarying vec3 vOmWorld;')
+          .replace('#include <common>', '#include <common>\nattribute float aWet;\nuniform float uTime;\nvarying float vWet;\nvarying float vGlow;\nvarying vec3 vOmWorld;')
           .replace('#include <begin_vertex>', `#include <begin_vertex>
             vec4 omWp = modelMatrix * vec4(transformed, 1.0);
             float omSway = step(0.4, aWet) * (1.0 - step(0.75, aWet));
             transformed.x += sin(uTime * 1.7 + omWp.x * 0.6 + omWp.y * 0.4) * 0.035 * omSway;
             transformed.z += cos(uTime * 1.3 + omWp.z * 0.5 + omWp.y * 0.3) * 0.03 * omSway;
             vWet = step(0.75, aWet);
+            vGlow = step(0.15, aWet) * (1.0 - step(0.4, aWet));
             vOmWorld = omWp.xyz;`);
         shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uCaustics;\nvarying float vWet;\nvarying vec3 vOmWorld;')
+          .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uCaustics;\nvarying float vWet;\nvarying float vGlow;\nvarying vec3 vOmWorld;')
+          .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+            if (vGlow > 0.5) {
+              float shimmer = 0.9 + 0.1 * sin(vOmWorld.x * 3.1 + uTime * 1.3) * sin(vOmWorld.z * 2.7 - uTime * 0.9) + 0.05 * sin(uTime * 2.1 + vOmWorld.y * 5.0);
+              totalEmissiveRadiance += diffuseColor.rgb * shimmer * 0.95;
+            }`)
           .replace('#include <fog_fragment>', `if (vWet > 0.5) {
               vec2 cp = vOmWorld.xz * 0.9 + vOmWorld.y * 0.3;
               float c1 = sin(cp.x * 2.1 + uTime * 1.3) * sin(cp.y * 2.3 - uTime * 1.1);
@@ -6701,7 +6884,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
             }
             #include <fog_fragment>`);
       };
-      m.customProgramCacheKey = () => (cutout ? 'om-terrain-cutout-v1' : 'om-terrain-v1');
+      m.customProgramCacheKey = () => (cutout ? 'om-terrain-cutout-v2' : 'om-terrain-v2');
       return m;
     };
     return { opaque: make(false), cutout: make(true), water: null, common };
@@ -6828,7 +7011,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       if (cause === 'drown') toast('You are running out of air!', 1200);
     };
     P.onDeath = (cause) => {
-      const msg = { fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.' }[cause] || 'You blacked out.';
+      const msg = {
+        fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.',
+        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.'
+      }[cause] || 'You blacked out.';
       $('death-reason').textContent = msg;
       if (cause === 'void') { respawn(); toast('You fell out of the world — back to the meadow.'); return; }
       setState('dead');
@@ -7437,6 +7623,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);
+    $('lava-overlay').style.opacity = P.lavaHead ? '0.94' : '0';
+    $('fire-overlay').style.opacity = P.burning > 0 && !P.dead ? (0.55 + 0.25 * Math.sin(G.time * 11)).toFixed(2) : '0';
 
     G.frames++; G.fpsTime += dt;
     if (G.fpsTime >= 0.5) { G.fps = Math.round(G.frames / G.fpsTime); G.frames = 0; G.fpsTime = 0; }

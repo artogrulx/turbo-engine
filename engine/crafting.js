@@ -40,6 +40,7 @@
   setTool([B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.BRICKS, B.STONE_BRICKS, B.COAL_ORE, B.FURNACE], 'pickaxe', 1);
   setTool([B.IRON_ORE], 'pickaxe', 2);
   setTool([B.DIAMOND_ORE], 'pickaxe', 3);
+  setTool([B.OBSIDIAN], 'pickaxe', 4);                          // only a diamond pickaxe can harvest obsidian
   setTool([B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG, B.PLANKS, B.BIRCH_PLANKS, B.CRAFTING_TABLE], 'axe', 0);
   setTool([B.DIRT, B.GRASS, B.SAND, B.GRAVEL, B.CLAY, B.SNOW], 'shovel', 0);
 

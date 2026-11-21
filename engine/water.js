@@ -18,6 +18,7 @@
   const OM = window.OM;
   const { CY } = OM.CONST;
   const SOLID = OM.Blocks.SOLID, OPAQUE = OM.Blocks.OPAQUE;
+  const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
   const LEVEL = 15, SOURCE = 16, FALLING = 32, FULL = 8;
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const OPP = [1, 0, 3, 2];
@@ -176,7 +177,15 @@
         // it spreads again on its next update, once its level is stable
         if (!(next & SOURCE) && strength(next) < strength(cur)) return;
       }
-      if (next > 0) this.spread(x, y, z, next);
+      if (next > 0) { this.quench(x, y, z); this.spread(x, y, z, next); }
+    }
+    /** Lava that water touches cools into obsidian (a river reaching a lava lake, a poured bucket...). */
+    quench(x, y, z) {
+      const W = this.world;
+      for (let d = 0; d < 6; d++) {
+        const nx = x + NEIGHBOURS[d][0], ny = y + NEIGHBOURS[d][1], nz = z + NEIGHBOURS[d][2];
+        if (W.getBlock(nx, ny, nz) === OM.B.LAVA) W.setBlock(nx, ny, nz, OM.B.OBSIDIAN);
+      }
     }
     canReceive(x, y, z, lvl) {
       const b = this.world.getBlock(x, y, z);
