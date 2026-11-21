@@ -8,7 +8,7 @@
   'use strict';
   const OM = window.OM;
   const G = 32, JUMP_V = 8.9, EPS = 1e-4;
-  const LAVA = OM.B.LAVA;
+  const LAVA = OM.B.LAVA, PORTAL = OM.B.PORTAL, VOID_GATE = OM.B.VOID_GATE;
 
   class Player {
     constructor(world) {
@@ -20,7 +20,8 @@
       this.width = 0.6; this.height = 1.8; this.eye = 1.62;
       this.onGround = false; this.wasOnGround = false;
       this.submerged = 0; this.inWater = false; this.headUnder = false;
-      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;   // lava and the fire it leaves on you
+      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;
+      this.inPortal = '';        // 'portal' or 'gate' while the body overlaps one (main.js turns a few seconds of that into a journey)   // lava and the fire it leaves on you
       this.sneaking = false; this.sprinting = false; this.collidedH = false; this.hitAxis = false;
       this.health = 20; this.maxHealth = 20; this.air = 15; this.maxAir = 15;
       this.fallStart = null; this.lastDamage = -100; this.regenTimer = 0; this.drownTimer = 0;
@@ -137,6 +138,7 @@
       if (this.inWater && !wasInWater && this.vel.y < -4 && this.onSplash) this.onSplash(-this.vel.y);
       this.inLava = this.touches(LAVA);
       this.lavaHead = this.inLava && W.getBlock(Math.floor(p.x), Math.floor(p.y + this.eye), Math.floor(p.z)) === LAVA;
+      this.inPortal = this.touches(PORTAL) ? 'portal' : this.touches(VOID_GATE) ? 'gate' : '';
 
       // stance
       const wantSneak = inp.sneak && !this.inWater;

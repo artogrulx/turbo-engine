@@ -27,10 +27,10 @@ You need a recent desktop browser with WebGL2 and an internet connection on firs
 | `C` | Crouch (you won't walk off edges) · dive |
 | Mouse | Look around (arrow keys also work) |
 | Left click | Hold to mine a block · click to pick a flower |
-| Right click | Place a block or flower · use the bucket |
+| Right click | Place a block or flower · use the bucket · open a crafting table or furnace (crouch to build against one) · light a portal with the igniter · talk to a villager |
 | Middle click | Pick the block you are looking at |
 | `1`–`9` · mouse wheel | Choose hotbar slot |
-| `E` | Open / close the inventory |
+| `E` | Open / close the inventory (with a 2×2 crafting grid and a recipe book) |
 | `Esc` | Pause and release the mouse |
 | `F3` | Debug information |
 
@@ -46,6 +46,23 @@ The inventory supports click to pick up / place, right-click to split a stack, `
 - **Sky** — a 24-minute day/night cycle with sun, moon, stars, drifting clouds, golden-hour colours and shadows that follow you.
 - **Physics** — axis-aligned bounding-box collision at a fixed 120 Hz, so you can't clip into blocks; crouch edge protection, optional auto-jump, fall damage and health regeneration.
 - **Mining and building** — hardness-based mining with a crack overlay and break particles. Mined blocks leave real holes you can fall into and the ground is never restored; placing checks that the spot is free and that the block wouldn't overlap you. Edits are kept per chunk, so they survive chunks unloading and reloading.
+
+## The adventure
+
+The meadow is only the first world. There is a way through the whole thing, and it never ends: terrain streams in forever in every direction.
+
+1. **Craft.** The inventory has a 2×2 grid; a crafting table gives a 3×3 grid. The **Recipes** button lists every recipe. Logs → planks → sticks, tools in four tiers (wood, stone, iron, diamond) with mining levels and wear, a furnace (cobblestone ring) that smelts iron, glass, stone and bricks, buckets, igniters and seeker eyes. Stone needs a pickaxe, iron needs a stone one and diamonds need an iron one. A fifth tier, **Emberforged**, upgrades a diamond tool with two ingots smelted from ember ore (found only deep in the Ashlands, mined with a diamond pickaxe).
+2. **Mine.** Coal and iron lie in the hills, diamonds deep below y=22. Careful: there are lava pockets down there, and lava lakes on the surface. Lava burns hard and sets you alight until you reach water.
+3. **Obsidian.** Water poured on lava (or any water that touches it) cools it to obsidian. It only breaks with a diamond pickaxe. Frame a doorway of it (at least 4 wide and 5 tall outside) and light it with an **igniter** (flint + iron ingot).
+4. **The Ashlands.** Walk into the portal for a few seconds to cross into a roofed cavern of ash with a sea of lava, glowing emberstone and cinder-brick citadels (one block there is eight in the meadow, so portals are a shortcut). A portal waits where you arrive.
+5. **Creatures.** Gloomwalkers and hissbloom (a walking bloom that blows holes in the ground) come out at night; ash hounds, void stalkers (they teleport) and cinderlings (they float and throw fire, and only gather around the citadels) live in the Ashlands. Hit them with a sword; loot goes straight into your pack. Cinderlings drop **ember rods**, void stalkers drop **void pearls**.
+6. **Seeker eyes.** Ember rod + void pearl. Right-click one in the meadow and it drifts toward the nearest sealed **vault** (hundreds of blocks away, buried at y≈13). It sinks into the ground when you are close: dig down.
+7. **The Void Gate.** The vault holds a ring of eight gate frames, some already sealed. Right-click the bare ones with seeker eyes; when all eight are sealed the gate in the middle opens.
+8. **The Void Isle.** A floating island ringed by obsidian pillars, and **the Starwyrm**. Fall or die there and you wake on the arrival platform with the dragon still hurt. Defeat it for the ending and a gate home.
+
+Villages stand on flat ground — plank-and-log houses around a lantern plaza, some with a crafting table or a furnace indoors — and villagers give hints about the next step. Furnaces and portals work in single-player worlds; in a multiplayer room creatures, furnaces and portal travel stay on your own machine.
+
+**Backups.** *Export World* (title menu and pause menu) downloads your whole save — every realm's changes, inventory, furnaces and progress — as a JSON file; *Import World* replaces your world with one.
 
 ## Settings and saving
 
@@ -63,15 +80,18 @@ inventory.js      inventory model and its UI
 engine/
   noise.js        seeded random numbers, hashing, simplex noise
   blocks.js       block, plant and item definitions plus fast lookup tables
+  crafting.js     recipes, tool tiers and harvest levels, smelting and the furnace (pure rules, no DOM)
   textures.js     procedural textures: blocks, plants, water normals, wings, inventory icons
-  terrain.js      world generator: terrain, trees, plants, springs, spawn search
+  terrain.js      world generator: terrain, trees, plants, springs, ore, lava lakes, villages, buried vaults, spawn search
+  realms.js       the Ashlands and Void Isle generators, portal frames, shrines, travel helpers
+  mobs.js         creatures: models, physics, behaviours, combat, projectiles, spawning
   mesher.js       chunk -> geometry (face culling, ambient occlusion, sky light)
   world.js        chunk storage and streaming, player edits, ray casting, grass spread
   water.js        water simulation, animated surface mesh and shader
   sky.js          day/night cycle, sky dome, sun and moon, shadows, fog
   nature.js       grass and flower meshes with GPU wind, pollen particles
   wildlife.js     butterflies and bees
-  player.js       AABB physics, swimming, health and breath
+  player.js       AABB physics, swimming, lava, health and breath
   interaction.js  targeting, mining, placing, bucket, held item, particles
   audio.js        synthesised sound effects and ambience
 ```
@@ -86,7 +106,8 @@ engine/
 
 - Water has no pressure — it won't climb back up a U-shaped channel.
 - There are no caves yet, and leaves don't decay when you cut a tree down.
-- Mined blocks go straight into your inventory instead of dropping as items.
+- Mined blocks and creature loot go straight into your inventory instead of dropping as items.
+- Realms, creatures and furnaces are not synchronised between players: portals refuse to work in multiplayer rooms.
 - Saves live in `localStorage` (roughly 5 MB per site).
 - Frame rate on integrated graphics may need a lower render distance or shadows turned down.
 

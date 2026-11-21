@@ -125,19 +125,21 @@
     }
   }
 
+  let minLight = 0.24;
   function sky(q) {
     const col = q % PA;
     const y = (q - col) / PA - 1;
     const top = padTop[col];
     if (y > top) return 1;
     const v = 1 - (top - y + 1) * 0.13;
-    return v < 0.24 ? 0.24 : v;
+    return v < minLight ? minLight : v;
   }
 
   const ao = [0, 0, 0, 0], li = [0, 0, 0, 0], tint = [1, 1, 1];
 
   function build(world, ch, uvTable, fancyLeaves) {
     fillPad(world, ch);
+    minLight = world.minLight || 0.24;
     gOpaque.reset(); gCutout.reset();
     const gen = world.gen;
     for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
@@ -157,7 +159,7 @@
           const nb = pad[np];
           if (nb) {
             if (OPAQUE[nb]) continue;
-            if (cut && nb === id && (id === B.GLASS || !fancyLeaves)) continue;
+            if (cut && nb === id && (id === B.GLASS || id === B.PORTAL || id === B.VOID_GATE || !fancyLeaves)) continue;
           }
           if (f === 3 && y === 0) continue;
           // ---- per-vertex AO + sky light ----

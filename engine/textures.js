@@ -316,6 +316,74 @@
     }
   }
 
+  function pAshstone(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => { const v = n(x, y) * 0.6 + m(x, y) * 0.4; return jit(t, mix([92, 56, 54], [158, 98, 84], v), 0.08); });
+    for (let s = 0; s < 8; s++) {
+      let x = t.r() * 32, y = t.r() * 32;
+      for (let k = 0; k < 9; k++) { t.set(x, y, mul(t.get(x | 0, y | 0), 0.62)); x += t.r() * 2 - 0.6; y += t.r() - 0.5; }
+    }
+    for (let i = 0; i < 14; i++) t.set(t.r() * 32, t.r() * 32, [168, 70, 40]);
+  }
+  function pAshOre(t) {
+    pAshstone(t);
+    for (let i = 0; i < 7; i++) {
+      const cx = t.r() * 32, cy = t.r() * 32;
+      for (let k = 0; k < 5; k++) t.disc(cx + t.r() * 3 - 1.5, cy + t.r() * 3 - 1.5, 0.9 + t.r() * 0.8, k % 2 ? [255, 150, 40] : [255, 214, 90]);
+    }
+  }
+  function pEmberstone(t) {
+    const a = t.lattice(6), b = t.lattice(12);
+    t.each((x, y) => {
+      const v = a(x, y) * 0.65 + b(x, y) * 0.35;
+      return jit(t, v < 0.42 ? mix([186, 70, 18], [240, 130, 30], v / 0.42) : mix([250, 170, 50], [255, 236, 130], Math.min(1, (v - 0.42) / 0.35)), 0.05);
+    });
+  }
+  function pCinderBrick(t) {
+    const n = t.lattice(8);
+    t.each((x, y) => {
+      const row = Math.floor(y / 8), off = (row % 2) * 8;
+      if (y % 8 === 7 || (x + off) % 16 === 15) return jit(t, [62, 36, 38], 0.08);
+      return jit(t, mul([132, 58, 56], 0.82 + N.hash2(row, Math.floor((x + off) / 16), 91) * 0.3 + (n(x, y) - 0.5) * 0.14), 0.06);
+    });
+  }
+  function pPortal(t) {
+    const n = t.lattice(6), h = t.lattice(8);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const sw = Math.sin((x + y) * 0.38 + n(x, y) * 5 + Math.sin(y * 0.3) * 1.5) * 0.5 + 0.5;
+      t.set(x, y, jit(t, mix([96, 42, 178], [214, 120, 255], sw), 0.05), h(x, y) < 0.2 ? 0 : 255);
+    }
+  }
+  function pGateTop(t, eye) {
+    pStoneBricks(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [70, 96, 80], 0.35); });
+    for (let y = 6; y < 26; y++) for (let x = 6; x < 26; x++) t.set(x, y, (x < 8 || x > 23 || y < 8 || y > 23) ? [58, 92, 74] : [14, 16, 22]);
+    if (eye) {
+      for (let y = 9; y < 23; y++) for (let x = 9; x < 23; x++) {
+        const d = Math.hypot(x - 15.5, y - 15.5);
+        if (d < 6.4) t.set(x, y, d < 2.4 ? [10, 30, 30] : d < 4 ? [70, 230, 180] : [180, 255, 230]);
+      }
+    }
+  }
+  function pGateSide(t) {
+    pStoneBricks(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [64, 90, 74], 0.4); });
+    for (let x = 0; x < 32; x++) { t.set(x, 0, [40, 60, 50]); t.set(x, 1, [88, 120, 100]); }
+  }
+  function pVoidGate(t) {
+    const n = t.lattice(8);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      let c = mix([8, 2, 22], [40, 14, 84], n(x, y));
+      if (t.r() < 0.05) c = [190, 150, 255];
+      t.set(x, y, c, n((x + 5) % 32, y) < 0.14 ? 0 : 255);
+    }
+  }
+  function pVoidstone(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => jit(t, mix([196, 192, 124], [236, 232, 170], n(x, y) * 0.6 + m(x, y) * 0.4), 0.07));
+    for (let i = 0; i < 26; i++) t.set(t.r() * 32, t.r() * 32, [150, 146, 92]);
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -344,7 +412,10 @@
     birch_planks: (t) => pPlanks(t, [206, 186, 134]),
     crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
     furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre,
-    lava: pLava, obsidian: pObsidian
+    lava: pLava, obsidian: pObsidian,
+    ashstone: pAshstone, ash_ore: pAshOre, emberstone: pEmberstone, cinderbrick: pCinderBrick, portal: pPortal,
+    gate_top: (t) => pGateTop(t, false), gate_eye_top: (t) => pGateTop(t, true), gate_side: pGateSide,
+    void_gate: pVoidGate, voidstone: pVoidstone
   };
 
   function buildBlockAtlas() {
@@ -736,8 +807,8 @@
       } else if (item.kind === 'tool') {
         const tier = OM.Crafting ? OM.Crafting.TIERS[item.tierIdx] : null;
         drawSprite(ctx, toolSprite(item.tool, tier ? tier.color : [180, 180, 180]));
-      } else if (item.kind === 'material') {
-        drawSprite(ctx, materialSprite(item.material));
+      } else if (item.kind === 'material' || item.kind === 'igniter' || item.kind === 'seeker') {
+        drawSprite(ctx, materialSprite(item.kind === 'igniter' ? 'igniter' : item.material));
       } else {
         drawBucket(ctx, item.kind === 'water_bucket');
       }
@@ -848,6 +919,27 @@
       s.poly([[3, 6], [8, 6], [8, 13.4]], [54, 194, 210]);
       s.poly([[8, 6], [13, 6], [8, 13.4]], [32, 148, 176]);
       s.p(6, 4, [255, 255, 255]); s.p(5, 5, [220, 255, 255]);
+    } else if (key === 'ember_rod') {
+      s.line(3, 13, 12, 4, [255, 168, 48], [196, 84, 20]);
+      s.line(6, 10, 7, 9, [255, 214, 100]); s.line(9, 7, 10, 6, [255, 214, 100]);
+      s.p(12, 3, [255, 244, 160]); s.p(13, 3, [255, 190, 70]); s.p(11, 2, [255, 232, 130]); s.p(14, 5, [255, 214, 100]);
+    } else if (key === 'void_pearl') {
+      s.poly([[5, 2.5], [11, 2.5], [13.5, 5], [13.5, 11], [11, 13.5], [5, 13.5], [2.5, 11], [2.5, 5]], [58, 30, 104]);
+      s.poly([[4.5, 4], [8, 3], [10, 4.5], [6.5, 7.5], [4, 8]], [122, 74, 196]);
+      s.poly([[9, 13], [12.8, 10], [12.5, 7.5], [9, 10.5]], [30, 14, 62]);
+      s.p(6, 5, [236, 220, 255]); s.p(7, 4, [190, 150, 255]);
+    } else if (key === 'seeker') {
+      s.poly([[5, 2.5], [11, 2.5], [13.5, 5], [13.5, 11], [11, 13.5], [5, 13.5], [2.5, 11], [2.5, 5]], [34, 138, 118]);
+      s.poly([[6, 4.5], [10, 4.5], [11.5, 6], [11.5, 10], [10, 11.5], [6, 11.5], [4.5, 10], [4.5, 6]], [214, 252, 236]);
+      s.poly([[7, 6.5], [9, 6.5], [9.8, 7.4], [9.8, 8.8], [9, 9.6], [7, 9.6], [6.2, 8.8], [6.2, 7.4]], [24, 60, 70]);
+      s.p(7, 7, [255, 255, 255]);
+    } else if (key === 'igniter') {
+      s.poly([[2, 10.5], [6.5, 6.5], [13, 6.5], [8.5, 10.5]], [232, 234, 240]);
+      s.poly([[2, 10.5], [8.5, 10.5], [8.5, 13.5], [2, 13.5]], [190, 194, 204]);
+      s.poly([[8.5, 10.5], [13, 6.5], [13, 9.5], [8.5, 13.5]], [140, 144, 156]);
+      s.poly([[8, 6.4], [10.5, 2.6], [13.6, 4.4], [12, 7.4]], [78, 82, 96]);
+      s.poly([[9.6, 5.8], [10.8, 3.8], [12.6, 4.8], [11.6, 6.6]], [150, 156, 172]);
+      s.p(14, 2, [255, 190, 60]); s.p(13, 1, [255, 240, 140]); s.p(15, 3, [255, 150, 40]);
     } else {                                                                // flint
       s.poly([[4, 10.4], [6.6, 4], [10.4, 5.4], [12.6, 10.6], [8.6, 13.2]], [74, 78, 90]);
       s.poly([[6.6, 4.4], [9.8, 5.8], [8, 9], [5.6, 9.6]], [124, 130, 146]);

@@ -51,6 +51,11 @@ body.in-game #game-canvas { cursor: none; }
     radial-gradient(ellipse at 50% 35%, rgba(70, 170, 190, 0.05) 0%, rgba(10, 70, 90, 0.35) 70%, rgba(4, 30, 44, 0.75) 100%),
     linear-gradient(180deg, rgba(120, 210, 230, 0.12), rgba(10, 50, 70, 0.25));
 }
+#portal-overlay {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 4; display: grid; place-items: center;
+  background: radial-gradient(ellipse at center, rgba(150, 70, 230, 0.45) 0%, rgba(70, 20, 130, 0.88) 70%, rgba(20, 4, 44, 0.97) 100%);
+  font-size: 22px; font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
 #lava-overlay {
   position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 2;
   background: radial-gradient(ellipse at 50% 40%, rgba(255, 170, 40, 0.75) 0%, rgba(230, 70, 10, 0.9) 60%, rgba(120, 20, 0, 0.97) 100%);
@@ -128,6 +133,15 @@ body.in-game #game-canvas { cursor: none; }
   font: 12px/1.5 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
   background: rgba(0, 0, 0, 0.5); border-radius: 8px; white-space: pre;
 }
+
+#boss-bar { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(420px, 80vw); text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 0.05em; text-shadow: 1px 1px 0 #000; }
+.boss-track { height: 12px; margin-top: 5px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); overflow: hidden; }
+.boss-track i { display: block; height: 100%; width: 100%; background: linear-gradient(180deg, #d9a2ff, #7a3fd0); transition: width 0.15s; }
+#ending-screen { background: radial-gradient(ellipse at center, rgba(40, 18, 80, 0.55), rgba(8, 4, 24, 0.92)); z-index: 22; }
+.ending-panel { width: min(560px, 100%); text-align: center; }
+#mob-bar { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: min(260px, 60vw); text-align: center; font-size: 13px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
+.mob-track { height: 8px; margin-top: 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.25); overflow: hidden; }
+.mob-track i { display: block; height: 100%; width: 100%; background: linear-gradient(180deg, #ff7a6e, #d8362a); transition: width 0.12s; }
 
 /* ---------------------------------------------------------------- slots */
 .slot {
@@ -397,6 +411,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   <!-- 3D view -->
   <div id="canvas-host"></div>
   <div id="underwater-overlay"></div>
+  <div id="portal-overlay"><span id="portal-text"></span></div>
   <div id="lava-overlay"></div>
   <div id="fire-overlay"></div>
   <div id="damage-overlay"></div>
@@ -413,6 +428,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       <b>Left click</b> mine · <b>Right click</b> place / use · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory &amp; crafting · <b>Esc</b> pause
     </div>
     <div id="item-name"></div>
+    <div id="boss-bar" class="hidden"><span>The Starwyrm</span><div class="boss-track"><i id="boss-hp"></i></div></div>
+    <div id="mob-bar" class="hidden"><span id="mob-name"></span><div class="mob-track"><i id="mob-hp"></i></div></div>
     <div id="status">
       <div id="hearts"><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i></div>
       <div id="bubbles" class="hidden"><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i></div>
@@ -474,6 +491,16 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     <div id="cursor-stack" class="slot cursor"><img class="slot-icon" alt="" draggable="false"><span class="slot-count"></span></div>
   </div>
 
+  <!-- The ending -->
+  <div id="ending-screen" class="screen hidden">
+    <div class="panel ending-panel">
+      <h1 class="logo">The <span>Starwyrm</span> is gone</h1>
+      <p class="tagline">You crossed the lava lakes, lit the obsidian door and walked through the Ashlands. You sealed the Void Gate with seeker eyes and brought down the dragon of the Void Isle.</p>
+      <p class="muted">The meadow is quiet again. A gate home has opened in the middle of the isle — and the world goes on forever in every direction, so build, explore, or go looking for more.</p>
+      <div class="menu-buttons"><button id="btn-ending-continue" class="btn primary" type="button">Keep exploring</button></div>
+    </div>
+  </div>
+
   <!-- Loading -->
   <div id="loading-screen" class="screen">
     <div class="loading-card">
@@ -494,6 +521,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         <button id="btn-new" class="btn" type="button">New World</button>
         <button id="btn-multiplayer" class="btn" type="button">Multiplayer</button>
         <button id="btn-leave-mp" class="btn hidden" type="button">Leave Multiplayer</button>
+        <div class="btn-row" id="menu-backup-row">
+          <button id="btn-menu-export" class="btn" type="button" title="Download your world as a backup file">Export World</button>
+          <button id="btn-menu-import" class="btn" type="button" title="Replace your world with a backup file">Import World</button>
+        </div>
         <div class="btn-row">
           <button id="btn-settings" class="btn" type="button">Settings</button>
           <button id="btn-controls" class="btn" type="button">Controls</button>
@@ -514,11 +545,17 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           <button id="btn-pause-controls" class="btn" type="button">Controls</button>
         </div>
         <button id="btn-save" class="btn" type="button">Save World</button>
+        <div class="btn-row" id="pause-backup-row">
+          <button id="btn-export" class="btn" type="button" title="Download your world as a backup file">Export World</button>
+          <button id="btn-import" class="btn" type="button" title="Replace your world with a backup file">Import World</button>
+        </div>
         <button id="btn-quit" class="btn" type="button">Save &amp; Quit to Title</button>
       </div>
       <p class="muted">Your world also saves automatically every minute.</p>
     </div>
   </div>
+
+  <input id="import-file" type="file" accept=".json,application/json" class="hidden">
 
   <!-- Death -->
   <div id="death-screen" class="screen hidden">
@@ -833,7 +870,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian',
+    'ashstone', 'emberstone', 'cinderbrick', 'portal', 'gate_top', 'gate_side', 'gate_eye_top', 'void_gate', 'voidstone', 'ash_ore'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -846,7 +884,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
     BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
-    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28,
+    ASHSTONE: 29, EMBERSTONE: 30, CINDERBRICK: 31, PORTAL: 32, GATE_FRAME: 33, GATE_EYE: 34, VOID_GATE: 35, VOIDSTONE: 36, ASH_ORE: 37   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -889,6 +928,17 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   // Lava is a still, glowing liquid block: it blocks water like stone does, but the player sinks into it (liquid) and burns.
   def(B.LAVA, 'lava', 'Lava', { hardness: Infinity, tiles: [T.lava, T.lava, T.lava], drop: 0, liquid: true, glow: true, color: [236, 110, 30] });
   def(B.OBSIDIAN, 'obsidian', 'Obsidian', { hardness: 14, tiles: [T.obsidian, T.obsidian, T.obsidian], color: [34, 24, 54] });
+  // The fire realm's stone, its light block and its fortress bricks
+  def(B.ASHSTONE, 'ashstone', 'Ashstone', { hardness: 1.1, tiles: [T.ashstone, T.ashstone, T.ashstone], color: [96, 58, 54] });
+  def(B.EMBERSTONE, 'emberstone', 'Emberstone', { hardness: 0.7, tiles: [T.emberstone, T.emberstone, T.emberstone], glow: true, color: [255, 170, 60] });
+  def(B.CINDERBRICK, 'cinderbrick', 'Cinder Bricks', { hardness: 2.0, tiles: [T.cinderbrick, T.cinderbrick, T.cinderbrick], color: [96, 42, 42] });
+  // Portals: thin glowing membranes you can walk into (they only exist inside a lit frame, and cannot be carried)
+  def(B.PORTAL, 'portal', 'Portal', { solid: false, opaque: false, cutout: true, hardness: Infinity, tiles: [T.portal, T.portal, T.portal], drop: 0, glow: true, noItem: true, color: [150, 80, 220] });
+  def(B.GATE_FRAME, 'gate_frame', 'Gate Frame', { hardness: Infinity, tiles: [T.gate_top, T.gate_side, T.gate_side], drop: 0, noItem: true, color: [100, 112, 104] });
+  def(B.GATE_EYE, 'gate_eye', 'Sealed Gate Frame', { hardness: Infinity, tiles: [T.gate_eye_top, T.gate_side, T.gate_side], drop: 0, noItem: true, glow: true, color: [80, 200, 160] });
+  def(B.VOID_GATE, 'void_gate', 'Void Gate', { solid: false, opaque: false, cutout: true, hardness: Infinity, tiles: [T.void_gate, T.void_gate, T.void_gate], drop: 0, glow: true, noItem: true, color: [60, 20, 110] });
+  def(B.ASH_ORE, 'ash_ore', 'Ember Ore', { hardness: 3.2, tiles: [T.ash_ore, T.ash_ore, T.ash_ore], color: [190, 100, 60] });
+  def(B.VOIDSTONE, 'voidstone', 'Voidstone', { hardness: 1.6, tiles: [T.voidstone, T.voidstone, T.voidstone], color: [226, 222, 160] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
@@ -977,7 +1027,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const I = { BUCKET: 200, WATER_BUCKET: 201 };
   const itemDefs = [];
   for (const d of defs) {
-    if (!d || d.id === B.AIR || d.liquid) continue;   // lava cannot be carried
+    if (!d || d.id === B.AIR || d.liquid || d.noItem) continue;   // lava, portals and gates cannot be carried
     itemDefs[d.id] = { id: d.id, name: d.name, kind: 'block', block: d.id, max: 64, icon: null };
   }
   for (const d of plantDefs) {
@@ -1011,7 +1061,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
   // ----------------------------------------------------------------- materials
   const MATERIALS = [['STICK', 210, 'Stick'], ['COAL', 211, 'Coal'], ['RAW_IRON', 212, 'Raw Iron'],
-    ['IRON_INGOT', 213, 'Iron Ingot'], ['DIAMOND', 214, 'Diamond'], ['FLINT', 215, 'Flint']];
+    ['IRON_INGOT', 213, 'Iron Ingot'], ['DIAMOND', 214, 'Diamond'], ['FLINT', 215, 'Flint'],
+    ['EMBER_ROD', 216, 'Ember Rod'], ['VOID_PEARL', 217, 'Void Pearl'],
+    ['EMBER_SCRAP', 220, 'Ember Scrap'], ['EMBER_INGOT', 221, 'Emberforged Ingot']];
   for (const [key, id, name] of MATERIALS) {
     I[key] = id;
     Items.defs[id] = { id, name, kind: 'material', max: 64, icon: null, material: key.toLowerCase() };
@@ -1026,7 +1078,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     { key: 'wood', name: 'Wooden', level: 1, speed: 2.0, dur: 48, color: [172, 134, 80] },
     { key: 'stone', name: 'Stone', level: 2, speed: 3.2, dur: 110, color: [132, 132, 138] },
     { key: 'iron', name: 'Iron', level: 3, speed: 4.5, dur: 240, color: [218, 220, 226] },
-    { key: 'diamond', name: 'Diamond', level: 4, speed: 6.5, dur: 1100, color: [86, 226, 230] }
+    { key: 'diamond', name: 'Diamond', level: 4, speed: 6.5, dur: 1100, color: [86, 226, 230] },
+    { key: 'ember', name: 'Emberforged', level: 5, speed: 9, dur: 2400, color: [255, 128, 52] }     // upgraded from diamond with ingots smelted from Ashlands ore
   ];
   const toolId = (tier, kind) => 300 + tier * 4 + kind;
   TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => {
@@ -1034,12 +1087,28 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     Items.defs[id] = { id, name: t.name + ' ' + KIND_NAME[k], kind: 'tool', tool: k, tier: t.level, tierIdx: ti, speed: t.speed, dur: t.dur, max: 1, icon: null };
   }));
 
+  // The seeker eye drifts toward the nearest vault, and seals the frames of its gate (see interaction.js).
+  I.SEEKER = 218;
+  Items.defs[218] = { id: 218, name: 'Seeker Eye', kind: 'seeker', material: 'seeker', max: 16, icon: null };
+  // The igniter lights an obsidian frame (see interaction.js); it wears out like a tool.
+  I.IGNITER = 219;
+  Items.defs[219] = { id: 219, name: 'Igniter', kind: 'igniter', tool: 'igniter', dur: 64, max: 1, icon: null };
+  // Melee damage by held item (hearts are 2 hp): swords hit hardest, other tools a bit less, bare hands 1.
+  const DAMAGE = { sword: [4, 5, 6, 7, 9], axe: [3, 4, 5, 6, 8], pickaxe: [2, 3, 4, 5, 6], shovel: [2, 3, 4, 5, 6] };
+  function weaponDamage(itemId) {
+    const it = itemId ? Items.get(itemId) : null;
+    return it && it.kind === 'tool' ? DAMAGE[it.tool][it.tierIdx] : 1;
+  }
+
   // Which tool a block prefers and which tier it needs before it drops anything.
   function setTool(ids, kind, level) { for (const id of ids) { BL.TOOL[id] = TOOL_CODE[kind]; BL.LEVEL[id] = level; } }
   setTool([B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.BRICKS, B.STONE_BRICKS, B.COAL_ORE, B.FURNACE], 'pickaxe', 1);
   setTool([B.IRON_ORE], 'pickaxe', 2);
   setTool([B.DIAMOND_ORE], 'pickaxe', 3);
-  setTool([B.OBSIDIAN], 'pickaxe', 4);                          // only a diamond pickaxe can harvest obsidian
+  setTool([B.OBSIDIAN], 'pickaxe', 4);
+  setTool([B.ASHSTONE, B.CINDERBRICK, B.VOIDSTONE], 'pickaxe', 1);
+  setTool([B.EMBERSTONE], 'pickaxe', 0);
+  setTool([B.ASH_ORE], 'pickaxe', 4);                           // ember ore (only in the Ashlands) wants a diamond pickaxe                          // only a diamond pickaxe can harvest obsidian
   setTool([B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG, B.PLANKS, B.BIRCH_PLANKS, B.CRAFTING_TABLE], 'axe', 0);
   setTool([B.DIRT, B.GRASS, B.SAND, B.GRAVEL, B.CLAY, B.SNOW], 'shovel', 0);
 
@@ -1047,6 +1116,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   BL.defs[B.COAL_ORE].drop = I.COAL;
   BL.defs[B.IRON_ORE].drop = I.RAW_IRON;
   BL.defs[B.DIAMOND_ORE].drop = I.DIAMOND;
+  BL.defs[B.ASH_ORE].drop = I.EMBER_SCRAP;
   function dropFor(block, rand) {
     if (block === B.GRAVEL && (rand === undefined ? Math.random() : rand) < 0.25) return I.FLINT;
     return BL.defs[block].drop;
@@ -1081,9 +1151,14 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   shaped(['CCC', 'C C', 'CCC'], { C: G.cobble }, B.FURNACE, 1);
   shaped(['SS', 'SS'], { S: B.STONE }, B.STONE_BRICKS, 4);
   shaped(['I I', ' I '], { I: I.IRON_INGOT }, I.BUCKET, 1);
+  shapeless([I.FLINT, I.IRON_INGOT], I.IGNITER, 1);
+  shapeless([I.EMBER_ROD, I.VOID_PEARL], I.SEEKER, 1);
   const HEADS = [G.planks, G.cobble, I.IRON_INGOT, I.DIAMOND];
   const PATTERN = { pickaxe: ['MMM', ' S ', ' S '], axe: ['MM', 'MS', ' S'], shovel: ['M', 'S', 'S'], sword: ['M', 'M', 'S'] };
-  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => shaped(PATTERN[k], { M: HEADS[ti], S: I.STICK }, toolId(ti, ki), 1)));
+  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => {
+    if (HEADS[ti]) shaped(PATTERN[k], { M: HEADS[ti], S: I.STICK }, toolId(ti, ki), 1);
+    else shapeless([toolId(ti - 1, ki), I.EMBER_INGOT, I.EMBER_INGOT], toolId(ti, ki), 1);   // the top tier: a diamond tool and two emberforged ingots
+  }));
 
   function shapedMatches(r, cells, x0, y0, w, h, mirror) {
     for (let y = 0; y < h; y++) {
@@ -1128,7 +1203,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   }
 
   // ----------------------------------------------------------------- smelting
-  const SMELT = new Map([[I.RAW_IRON, I.IRON_INGOT], [B.COBBLE, B.STONE], [B.MOSSY_COBBLE, B.STONE], [B.SAND, B.GLASS], [B.CLAY, B.BRICKS]]);
+  const SMELT = new Map([[I.RAW_IRON, I.IRON_INGOT], [I.EMBER_SCRAP, I.EMBER_INGOT], [B.COBBLE, B.STONE], [B.MOSSY_COBBLE, B.STONE], [B.SAND, B.GLASS], [B.CLAY, B.BRICKS]]);
   const FUEL = new Map([[I.COAL, 80], [B.OAK_LOG, 15], [B.BIRCH_LOG, 15], [B.SPRUCE_LOG, 15], [B.PLANKS, 15], [B.BIRCH_PLANKS, 15], [B.CRAFTING_TABLE, 15], [I.STICK, 5]]);
   const SMELT_SECONDS = 8;
 
@@ -1173,7 +1248,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   /** Every furnace placed in the world, keyed by block position. */
   const Furnaces = {
     map: new Map(),
-    key(x, y, z) { return x + ',' + y + ',' + z; },
+    realm: 'meadow',                // furnaces in the other realms are keyed apart (same coordinates, different world)
+    key(x, y, z) { return (this.realm === 'meadow' ? '' : this.realm + ':') + x + ',' + y + ',' + z; },
     at(x, y, z) { const k = this.key(x, y, z); let f = this.map.get(k); if (!f) this.map.set(k, (f = new Furnace())); return f; },
     /** Removes a furnace and returns what was inside it. */
     take(x, y, z) { const k = this.key(x, y, z), f = this.map.get(k); this.map.delete(k); return f ? f.slots.filter(Boolean) : []; },
@@ -1186,7 +1262,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
   };
 
-  OM.Crafting = { recipes, find, mining, dropFor, TIERS, KINDS, toolId, GROUP: G, SMELT, FUEL, SMELT_SECONDS, Furnace };
+  OM.Crafting = { recipes, find, mining, dropFor, weaponDamage, TIERS, KINDS, toolId, GROUP: G, SMELT, FUEL, SMELT_SECONDS, Furnace };
   OM.Furnaces = Furnaces;
 })();
 
@@ -1510,6 +1586,74 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
   }
 
+  function pAshstone(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => { const v = n(x, y) * 0.6 + m(x, y) * 0.4; return jit(t, mix([92, 56, 54], [158, 98, 84], v), 0.08); });
+    for (let s = 0; s < 8; s++) {
+      let x = t.r() * 32, y = t.r() * 32;
+      for (let k = 0; k < 9; k++) { t.set(x, y, mul(t.get(x | 0, y | 0), 0.62)); x += t.r() * 2 - 0.6; y += t.r() - 0.5; }
+    }
+    for (let i = 0; i < 14; i++) t.set(t.r() * 32, t.r() * 32, [168, 70, 40]);
+  }
+  function pAshOre(t) {
+    pAshstone(t);
+    for (let i = 0; i < 7; i++) {
+      const cx = t.r() * 32, cy = t.r() * 32;
+      for (let k = 0; k < 5; k++) t.disc(cx + t.r() * 3 - 1.5, cy + t.r() * 3 - 1.5, 0.9 + t.r() * 0.8, k % 2 ? [255, 150, 40] : [255, 214, 90]);
+    }
+  }
+  function pEmberstone(t) {
+    const a = t.lattice(6), b = t.lattice(12);
+    t.each((x, y) => {
+      const v = a(x, y) * 0.65 + b(x, y) * 0.35;
+      return jit(t, v < 0.42 ? mix([186, 70, 18], [240, 130, 30], v / 0.42) : mix([250, 170, 50], [255, 236, 130], Math.min(1, (v - 0.42) / 0.35)), 0.05);
+    });
+  }
+  function pCinderBrick(t) {
+    const n = t.lattice(8);
+    t.each((x, y) => {
+      const row = Math.floor(y / 8), off = (row % 2) * 8;
+      if (y % 8 === 7 || (x + off) % 16 === 15) return jit(t, [62, 36, 38], 0.08);
+      return jit(t, mul([132, 58, 56], 0.82 + N.hash2(row, Math.floor((x + off) / 16), 91) * 0.3 + (n(x, y) - 0.5) * 0.14), 0.06);
+    });
+  }
+  function pPortal(t) {
+    const n = t.lattice(6), h = t.lattice(8);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const sw = Math.sin((x + y) * 0.38 + n(x, y) * 5 + Math.sin(y * 0.3) * 1.5) * 0.5 + 0.5;
+      t.set(x, y, jit(t, mix([96, 42, 178], [214, 120, 255], sw), 0.05), h(x, y) < 0.2 ? 0 : 255);
+    }
+  }
+  function pGateTop(t, eye) {
+    pStoneBricks(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [70, 96, 80], 0.35); });
+    for (let y = 6; y < 26; y++) for (let x = 6; x < 26; x++) t.set(x, y, (x < 8 || x > 23 || y < 8 || y > 23) ? [58, 92, 74] : [14, 16, 22]);
+    if (eye) {
+      for (let y = 9; y < 23; y++) for (let x = 9; x < 23; x++) {
+        const d = Math.hypot(x - 15.5, y - 15.5);
+        if (d < 6.4) t.set(x, y, d < 2.4 ? [10, 30, 30] : d < 4 ? [70, 230, 180] : [180, 255, 230]);
+      }
+    }
+  }
+  function pGateSide(t) {
+    pStoneBricks(t);
+    t.each((x, y) => { const c = t.get(x, y); return mix([c[0], c[1], c[2]], [64, 90, 74], 0.4); });
+    for (let x = 0; x < 32; x++) { t.set(x, 0, [40, 60, 50]); t.set(x, 1, [88, 120, 100]); }
+  }
+  function pVoidGate(t) {
+    const n = t.lattice(8);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      let c = mix([8, 2, 22], [40, 14, 84], n(x, y));
+      if (t.r() < 0.05) c = [190, 150, 255];
+      t.set(x, y, c, n((x + 5) % 32, y) < 0.14 ? 0 : 255);
+    }
+  }
+  function pVoidstone(t) {
+    const n = t.lattice(8), m = t.lattice(16);
+    t.each((x, y) => jit(t, mix([196, 192, 124], [236, 232, 170], n(x, y) * 0.6 + m(x, y) * 0.4), 0.07));
+    for (let i = 0; i < 26; i++) t.set(t.r() * 32, t.r() * 32, [150, 146, 92]);
+  }
+
   const PAINTERS = {
     grass_top: pGrassTop, grass_side: pGrassSide, dirt: pDirt, stone: pStone, sand: pSand, gravel: pGravel, clay: pClay,
     oak_log: (t) => pBark(t, [82, 62, 38], [120, 94, 60], 5),
@@ -1538,7 +1682,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     birch_planks: (t) => pPlanks(t, [206, 186, 134]),
     crafting_table_top: pCraftTop, crafting_table_side: pCraftSide,
     furnace_top: pFurnaceTop, furnace_side: pFurnaceSide, diamond_ore: pDiamondOre,
-    lava: pLava, obsidian: pObsidian
+    lava: pLava, obsidian: pObsidian,
+    ashstone: pAshstone, ash_ore: pAshOre, emberstone: pEmberstone, cinderbrick: pCinderBrick, portal: pPortal,
+    gate_top: (t) => pGateTop(t, false), gate_eye_top: (t) => pGateTop(t, true), gate_side: pGateSide,
+    void_gate: pVoidGate, voidstone: pVoidstone
   };
 
   function buildBlockAtlas() {
@@ -1930,8 +2077,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       } else if (item.kind === 'tool') {
         const tier = OM.Crafting ? OM.Crafting.TIERS[item.tierIdx] : null;
         drawSprite(ctx, toolSprite(item.tool, tier ? tier.color : [180, 180, 180]));
-      } else if (item.kind === 'material') {
-        drawSprite(ctx, materialSprite(item.material));
+      } else if (item.kind === 'material' || item.kind === 'igniter' || item.kind === 'seeker') {
+        drawSprite(ctx, materialSprite(item.kind === 'igniter' ? 'igniter' : item.material));
       } else {
         drawBucket(ctx, item.kind === 'water_bucket');
       }
@@ -2042,6 +2189,27 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       s.poly([[3, 6], [8, 6], [8, 13.4]], [54, 194, 210]);
       s.poly([[8, 6], [13, 6], [8, 13.4]], [32, 148, 176]);
       s.p(6, 4, [255, 255, 255]); s.p(5, 5, [220, 255, 255]);
+    } else if (key === 'ember_rod') {
+      s.line(3, 13, 12, 4, [255, 168, 48], [196, 84, 20]);
+      s.line(6, 10, 7, 9, [255, 214, 100]); s.line(9, 7, 10, 6, [255, 214, 100]);
+      s.p(12, 3, [255, 244, 160]); s.p(13, 3, [255, 190, 70]); s.p(11, 2, [255, 232, 130]); s.p(14, 5, [255, 214, 100]);
+    } else if (key === 'void_pearl') {
+      s.poly([[5, 2.5], [11, 2.5], [13.5, 5], [13.5, 11], [11, 13.5], [5, 13.5], [2.5, 11], [2.5, 5]], [58, 30, 104]);
+      s.poly([[4.5, 4], [8, 3], [10, 4.5], [6.5, 7.5], [4, 8]], [122, 74, 196]);
+      s.poly([[9, 13], [12.8, 10], [12.5, 7.5], [9, 10.5]], [30, 14, 62]);
+      s.p(6, 5, [236, 220, 255]); s.p(7, 4, [190, 150, 255]);
+    } else if (key === 'seeker') {
+      s.poly([[5, 2.5], [11, 2.5], [13.5, 5], [13.5, 11], [11, 13.5], [5, 13.5], [2.5, 11], [2.5, 5]], [34, 138, 118]);
+      s.poly([[6, 4.5], [10, 4.5], [11.5, 6], [11.5, 10], [10, 11.5], [6, 11.5], [4.5, 10], [4.5, 6]], [214, 252, 236]);
+      s.poly([[7, 6.5], [9, 6.5], [9.8, 7.4], [9.8, 8.8], [9, 9.6], [7, 9.6], [6.2, 8.8], [6.2, 7.4]], [24, 60, 70]);
+      s.p(7, 7, [255, 255, 255]);
+    } else if (key === 'igniter') {
+      s.poly([[2, 10.5], [6.5, 6.5], [13, 6.5], [8.5, 10.5]], [232, 234, 240]);
+      s.poly([[2, 10.5], [8.5, 10.5], [8.5, 13.5], [2, 13.5]], [190, 194, 204]);
+      s.poly([[8.5, 10.5], [13, 6.5], [13, 9.5], [8.5, 13.5]], [140, 144, 156]);
+      s.poly([[8, 6.4], [10.5, 2.6], [13.6, 4.4], [12, 7.4]], [78, 82, 96]);
+      s.poly([[9.6, 5.8], [10.8, 3.8], [12.6, 4.8], [11.6, 6.6]], [150, 156, 172]);
+      s.p(14, 2, [255, 190, 60]); s.p(13, 1, [255, 240, 140]); s.p(15, 3, [255, 150, 40]);
     } else {                                                                // flint
       s.poly([[4, 10.4], [6.6, 4], [10.4, 5.4], [12.6, 10.6], [8.6, 13.2]], [74, 78, 90]);
       s.poly([[6.6, 4.4], [9.8, 5.8], [8, 9], [5.6, 9.6]], [124, 130, 146]);
@@ -2096,6 +2264,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   const WATER_SOURCE = 16 | 8;
   const FORCE = 256; // stamp flag: may replace terrain (used by boulders)
   const TREE_CELL = 5, BUSH_CELL = 7, ROCK_CELL = 11, SPRING_CELL = 48;
+  const VILLAGE_CELL = 176, VILLAGE_CHANCE = 0.55;   // a village candidate per 176x176 blocks
+  const VAULT_CELL = 512;                    // one sealed vault (the way to the Void Isle) per 512x512 blocks
   const LAVA_CELL = 52, LAVA_CHANCE = 0.4;   // one candidate lava lake per 52x52 blocks, 40% of which are kept
   const isLeaves = (id) => id === B.OAK_LEAVES || id === B.BIRCH_LEAVES || id === B.SPRUCE_LEAVES;
 
@@ -2206,6 +2376,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.col = { h: 0, river: 0, forest: 0, hill: 0 };
       this.cache = new Map();
       this.lavaCache = new Map();
+      this.vaultCache = new Map();
+      this.villageCache = new Map();
       this.hm = new Int16Array(18 * 18);
       this.riv = new Float32Array(18 * 18);
       this.fr = new Float32Array(18 * 18);
@@ -2332,6 +2504,131 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.lavaCache.set(key, res);
       return res;
     }
+    /** A village: a lantern plaza ringed by 4-7 plank-and-log houses with glass windows, gravel paths and the odd crafting table or
+     *  furnace indoors. Only on flat, dry land (the whole site is levelled to the plaza). Returns null when the cell has none. */
+    village(gx, gz) {
+      const key = (gx + 5000) * 10007 + gz + 5000;
+      if (this.villageCache.has(key)) return this.villageCache.get(key);
+      if (this.villageCache.size > 400) this.villageCache.clear();
+      const s = this.seed;
+      let res = null;
+      if (N.hash2(gx, gz, s + 951) < VILLAGE_CHANCE) {
+        const cx = gx * VILLAGE_CELL + 40 + Math.floor(N.hash2(gx, gz, s + 952) * (VILLAGE_CELL - 80));
+        const cz = gz * VILLAGE_CELL + 40 + Math.floor(N.hash2(gx, gz, s + 953) * (VILLAGE_CELL - 80));
+        const c = this.sample(cx, cz), h = Math.floor(c.h);
+        let ok = h > SEA + 3 && h < 80 && c.river < 0.2 && Math.hypot(cx, cz) > 50;
+        for (let a = 0; ok && a < 16; a++) {
+          const ang = (a * Math.PI) / 8, rad = a % 2 ? 24 : 15, q = this.sample(cx + Math.cos(ang) * rad, cz + Math.sin(ang) * rad);
+          if (Math.abs(Math.floor(q.h) - h) > 3 || q.river > 0.25 || q.h <= SEA + 2) ok = false;
+        }
+        if (ok && this.lavaNear(cx, cz, 34)) ok = false;
+        if (ok) {
+          const out = [], put = (x, y, z, id) => out.push(x, y, z, id | FORCE);
+          const rng = N.mulberry32(N.hashInt(gx, 17, gz, s + 954));
+          // plaza with a lantern post
+          for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+            if (dx * dx + dz * dz > 18) continue;
+            for (let y = h + 1; y <= h + 8; y++) put(cx + dx, y, cz + dz, 0);
+            put(cx + dx, h, cz + dz, (dx + dz) % 2 === 0 ? B.COBBLE : B.GRAVEL);
+          }
+          for (let y = h + 1; y <= h + 3; y++) put(cx, y, cz, B.COBBLE);
+          put(cx, h + 4, cz, B.EMBERSTONE);
+          const n = 4 + Math.floor(rng() * 4), houses = [];
+          for (let i = 0; i < n; i++) {
+            const ang = (i / n) * Math.PI * 2 + rng() * 0.5, rad = 13 + rng() * 6;
+            const w = 5 + 2 * Math.floor(rng() * 2), d = 5 + 2 * Math.floor(rng() * 2);
+            const hx = Math.round(cx + Math.cos(ang) * rad), hz = Math.round(cz + Math.sin(ang) * rad), hw = (w - 1) / 2, hd = (d - 1) / 2;
+            if (houses.some((o) => Math.abs(o.x - hx) < 10 && Math.abs(o.z - hz) < 10)) continue;
+            houses.push({ x: hx, z: hz });
+            const toX = Math.abs(cx - hx) > Math.abs(cz - hz), sx = Math.sign(cx - hx) || 1, sz = Math.sign(cz - hz) || 1;
+            const door = toX ? [hx + sx * hw, hz] : [hx, hz + sz * hd];
+            for (let dz = -hd - 1; dz <= hd + 1; dz++) for (let dx = -hw - 1; dx <= hw + 1; dx++) {        // level the site and clear the air above it
+              const x = hx + dx, z = hz + dz, g = Math.floor(this.sample(x, z).h);
+              for (let y = Math.min(g, h) - 1; y < h; y++) put(x, y, z, B.COBBLE);
+              for (let y = h + 1; y <= Math.max(g, h) + 9; y++) put(x, y, z, 0);
+            }
+            for (let dz = -hd; dz <= hd; dz++) for (let dx = -hw; dx <= hw; dx++) {
+              const x = hx + dx, z = hz + dz, edge = Math.abs(dx) === hw || Math.abs(dz) === hd, corner = Math.abs(dx) === hw && Math.abs(dz) === hd;
+              put(x, h, z, B.PLANKS);
+              for (let y = h + 1; y <= h + 3; y++) {
+                if (!edge) continue;
+                if (corner) put(x, y, z, B.OAK_LOG);
+                else if (x === door[0] && z === door[1] && y <= h + 2) continue;                         // the doorway stays open
+                else if (y === h + 2 && ((Math.abs(dx) === 0 && Math.abs(dz) === hd) || (Math.abs(dz) === 0 && Math.abs(dx) === hw))) put(x, y, z, B.GLASS);
+                else put(x, y, z, B.PLANKS);
+              }
+            }
+            for (let k = 0; k < 3; k++) {                                                                // stepped roof
+              const rw = hw + 1 - k, rd = hd + 1 - k;
+              if (rw < 0 || rd < 0) break;
+              for (let dz = -rd; dz <= rd; dz++) for (let dx = -rw; dx <= rw; dx++) put(hx + dx, h + 4 + k, hz + dz, k === 0 && (Math.abs(dx) === rw || Math.abs(dz) === rd) ? B.OAK_LOG : B.PLANKS);
+            }
+            if (rng() < 0.55) put(hx - hw + 1, h + 1, hz - hd + 1, B.CRAFTING_TABLE);
+            if (rng() < 0.4) put(hx + hw - 1, h + 1, hz - hd + 1, B.FURNACE);
+            // a gravel path from the doorway to the plaza
+            let px = door[0], pz = door[1];
+            for (let step = 0; step < 24 && Math.hypot(px - cx, pz - cz) > 4.5; step++) {
+              if (Math.abs(cx - px) > Math.abs(cz - pz)) px += Math.sign(cx - px); else pz += Math.sign(cz - pz);
+              const g = Math.floor(this.sample(px, pz).h);
+              if (Math.abs(g - h) <= 1) put(px, g, pz, B.GRAVEL);
+            }
+          }
+          res = { x: cx, z: cz, h, r: 28, blocks: out, houses };
+        }
+      }
+      this.villageCache.set(key, res);
+      return res;
+    }
+    villageNear(x, z, range) {
+      for (let gz = Math.floor((z - range - 30) / VILLAGE_CELL); gz <= Math.floor((z + range + 30) / VILLAGE_CELL); gz++)
+        for (let gx = Math.floor((x - range - 30) / VILLAGE_CELL); gx <= Math.floor((x + range + 30) / VILLAGE_CELL); gx++) {
+          const v = this.village(gx, gz);
+          if (v && Math.hypot(v.x - x, v.z - z) < range + v.r) return v;
+        }
+      return null;
+    }
+
+    /** The vault of a VAULT_CELL square: a buried brick room with a ring of eight gate frames (some already sealed) around a bare floor. */
+    vault(gx, gz) {
+      const key = (gx + 5000) * 10007 + gz + 5000;
+      const known = this.vaultCache.get(key);
+      if (known) return known;
+      const s = this.seed;
+      let x = gx * VAULT_CELL + 70 + Math.floor(N.hash2(gx, gz, s + 901) * (VAULT_CELL - 140));
+      const z = gz * VAULT_CELL + 70 + Math.floor(N.hash2(gx, gz, s + 902) * (VAULT_CELL - 140));
+      if (Math.hypot(x, z) < 220) x += 300;               // never right beside the spawn
+      const out = [], fy = 12;
+      const put = (px, py, pz, id) => out.push(px, py, pz, id | FORCE);
+      const brick = (px, py, pz) => put(px, py, pz, N.hash3(px, py, pz, s + 905) < 0.22 ? B.MOSSY_COBBLE : B.STONE_BRICKS);
+      for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) {
+        const px = x + dx, pz = z + dz, edge = Math.abs(dx) === 8 || Math.abs(dz) === 8;
+        brick(px, fy, pz); brick(px, fy + 8, pz);
+        for (let y = fy + 1; y < fy + 8; y++) { if (edge) brick(px, y, pz); else put(px, y, pz, 0); }
+      }
+      for (const [dx, dz] of [[-7, -7], [7, -7], [-7, 7], [7, 7], [-4, -4], [4, -4], [-4, 4], [4, 4], [0, -7], [0, 7], [-7, 0], [7, 0]]) put(x + dx, fy + 7, z + dz, B.EMBERSTONE);   // lamps
+      let sealed = 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dz) continue;
+        const eye = N.hash3(gx, gz, (dx + 1) * 3 + dz + 1, s + 903) < 0.25;
+        if (eye) sealed++;
+        put(x + dx, fy + 1, z + dz, eye ? B.GATE_EYE : B.GATE_FRAME);
+      }
+      if (sealed === 8) put(x, fy + 1, z, B.VOID_GATE);
+      for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) for (let y = fy + 1; y < fy + 7; y++) brick(x + dx, y, z + dz);    // pillars
+      const v = { x, z, y: fy + 1, blocks: out };
+      this.vaultCache.set(key, v);
+      return v;
+    }
+    /** The vault closest to (x, z) (the seeker eye follows this). */
+    nearestVault(x, z) {
+      let best = null, bd = 1e18;
+      const gx0 = Math.floor(x / VAULT_CELL), gz0 = Math.floor(z / VAULT_CELL);
+      for (let gz = gz0 - 2; gz <= gz0 + 2; gz++) for (let gx = gx0 - 2; gx <= gx0 + 2; gx++) {
+        const v = this.vault(gx, gz), d = (v.x - x) * (v.x - x) + (v.z - z) * (v.z - z);
+        if (d < bd) { bd = d; best = v; }
+      }
+      return best;
+    }
     /** The nearest lava lake within `range` blocks of (x, z), or null (used to keep the spawn point safe). */
     lavaNear(x, z, range) {
       for (let gz = Math.floor((z - range) / LAVA_CELL); gz <= Math.floor((z + range) / LAVA_CELL); gz++)
@@ -2406,6 +2703,20 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           const st = this.structure(kind, gx, gz);
           if (st) this.stamp(ch, st.blocks);
         }
+      }
+      // villages (after the trees, so they clear whatever grew in the way)
+      const wx0 = Math.floor((ch.x0 - 32) / VILLAGE_CELL), wx1 = Math.floor((ch.x0 + 15 + 32) / VILLAGE_CELL);
+      const wz0 = Math.floor((ch.z0 - 32) / VILLAGE_CELL), wz1 = Math.floor((ch.z0 + 15 + 32) / VILLAGE_CELL);
+      for (let gz = wz0; gz <= wz1; gz++) for (let gx = wx0; gx <= wx1; gx++) {
+        const v = this.village(gx, gz);
+        if (v && v.x + 32 >= ch.x0 && v.x - 32 <= ch.x0 + 15 && v.z + 32 >= ch.z0 && v.z - 32 <= ch.z0 + 15) this.stamp(ch, v.blocks);
+      }
+      // sealed vaults (deep underground, nothing grows over them)
+      const vx0 = Math.floor((ch.x0 - 10) / VAULT_CELL), vx1 = Math.floor((ch.x0 + 15 + 10) / VAULT_CELL);
+      const vz0 = Math.floor((ch.z0 - 10) / VAULT_CELL), vz1 = Math.floor((ch.z0 + 15 + 10) / VAULT_CELL);
+      for (let gz = vz0 - 1; gz <= vz1 + 1; gz++) for (let gx = vx0 - 1; gx <= vx1 + 1; gx++) {
+        const v = this.vault(gx, gz);
+        if (v.x + 9 >= ch.x0 && v.x - 9 <= ch.x0 + 15 && v.z + 9 >= ch.z0 && v.z - 9 <= ch.z0 + 15) this.stamp(ch, v.blocks);
       }
       // lava lakes go in last so they clear whatever grew over them
       const gx0 = Math.floor((ch.x0 - 8) / LAVA_CELL), gx1 = Math.floor((ch.x0 + 15 + 8) / LAVA_CELL);
@@ -2537,6 +2848,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const h = Math.floor(c.h), forest = c.forest, river = c.river, hill = c.hill;
       if (h <= SEA + 2 || h > SEA + 30 || forest > 0.12 || river > 0) return -100;
       if (this.lavaNear(x, z, 16)) return -60;                 // never start beside a lava lake
+      if (this.villageNear(x, z, 46)) return -45;              // nor inside a village
       let maxd = 0;
       const probes = [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, -2], [2, -2], [-2, 2]];
       for (const [dx, dz] of probes) maxd = Math.max(maxd, Math.abs(Math.floor(this.sample(x + dx, z + dz).h) - h));
@@ -2572,6 +2884,354 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
   OM.TerrainGen = TerrainGen;
   OM.TerrainGen.WATER_SOURCE = WATER_SOURCE;
+})();
+
+</script>
+<script>
+/* Open Meadow — engine/realms.js
+ * The other worlds and the doors between them.
+ *   EmberGen  – the Ashlands: a roofed cavern of ashstone with a lava sea, glowing emberstone and cinder-brick citadels
+ *   EndGen    – the Void Isle: one floating island of voidstone ringed by obsidian pillars
+ *   Portals   – finding / lighting / collapsing an obsidian portal frame, building arrival shrines, standing places
+ * Generators implement the same small interface as TerrainGen (generate, tintAt, riverFlow, sample, heightAt,
+ * biomeAt, findSpawn), so World can swap them in without knowing which realm it is drawing.               */
+(function () {
+  'use strict';
+  const OM = window.OM, B = OM.B, N = OM.Noise;
+  const { CY } = OM.CONST;
+  const FORCE = 256;
+  const LAVA_LEVEL = 36, CITADEL_CELL = 112, ISLE_TOP = 60;
+
+  function fbm(n, x, z, oct) {
+    let s = 0, a = 1, f = 1, t = 0;
+    for (let i = 0; i < oct; i++) { s += n.noise2D(x * f, z * f) * a; t += a; a *= 0.5; f *= 2; }
+    return s / t;
+  }
+
+  /** Shared stand-ins for the parts of the generator interface that only the meadow cares about. */
+  class RealmGen {
+    constructor() { this.col = { h: 0, river: 0, forest: 0, hill: 0 }; }
+    tintAt(x, z, out) { out[0] = out[1] = out[2] = 1; }
+    riverFlow(x, z, out) { out[0] = out[1] = 0; }
+    sample(x, z) { this.col.h = this.heightAt(x, z); return this.col; }
+  }
+
+  // =============================================================== the Ashlands
+  class EmberGen extends RealmGen {
+    constructor(seed) {
+      super();
+      this.seed = seed | 0;
+      const S = N.Simplex, s = this.seed ^ 0x7e57;
+      this.nFloor = new S(s ^ 0x111); this.nDetail = new S(s ^ 0x222); this.nRoof = new S(s ^ 0x333); this.nPillar = new S(s ^ 0x444);
+      this.citadels = new Map();
+      this.realm = 'ember';
+      this.minLight = 0.72;
+    }
+    floorAt(x, z) { return Math.floor(36 + fbm(this.nFloor, x / 70, z / 70, 3) * 17 + this.nDetail.noise2D(x / 14, z / 14) * 2.2); }
+    roofAt(x, z) {
+      let r = 112 + fbm(this.nRoof, x / 50, z / 50, 2) * 8;
+      const p = this.nPillar.noise2D(x / 9, z / 9);
+      if (p > 0.6) r -= (p - 0.6) * 75;                          // stalactites
+      return Math.floor(r);
+    }
+    heightAt(x, z) { return this.floorAt(x, z); }
+    biomeAt() { return 'Ashlands'; }
+
+    generate(ch) {
+      const s = this.seed, blocks = ch.blocks;
+      for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+        const wx = ch.x0 + lx, wz = ch.z0 + lz, base = lx + lz * 16;
+        const f = Math.max(3, Math.min(100, this.floorAt(wx, wz))), r = Math.max(f + 8, Math.min(CY - 6, this.roofAt(wx, wz)));
+        blocks[base] = B.BEDROCK;
+        if (N.hash3(wx, 1, wz, s) < 0.5) blocks[base + 256] = B.BEDROCK;
+        for (let y = 1; y <= f; y++) {
+          const i = base + y * 256;
+          if (blocks[i]) continue;
+          blocks[i] = y < f - 1 && y > 2 && N.hash3(wx >> 1, y >> 1, wz >> 1, s + 11) < 0.014 && N.hash3(wx, y, wz, s + 12) < 0.6 ? B.ASH_ORE : B.ASHSTONE;   // ember ore, buried in the ash
+        }
+        for (let y = f + 1; y <= LAVA_LEVEL; y++) blocks[base + y * 256] = B.LAVA;
+        for (let y = r; y < CY - 1; y++) blocks[base + y * 256] = B.ASHSTONE;
+        blocks[base + (CY - 1) * 256] = B.BEDROCK;
+        // glowing patches: on the ceiling's underside and as nodes on the floor
+        if (N.hash2(wx >> 1, wz >> 1, s + 5) < 0.07) { blocks[base + r * 256] = B.EMBERSTONE; if (N.hash2(wx, wz, s + 6) < 0.5) blocks[base + (r - 1) * 256] = B.EMBERSTONE; }
+        if (f > LAVA_LEVEL && N.hash2(wx >> 2, wz >> 2, s + 7) < 0.035 && N.hash2(wx, wz, s + 8) < 0.5) blocks[base + f * 256] = B.EMBERSTONE;
+      }
+      this.placeCitadels(ch);
+    }
+
+    // ----- cinder-brick citadels: crossing bridges and a central hall (shared by neighbouring chunks, so cached) -----
+    citadel(gx, gz) {
+      const key = (gx + 100000) * 200003 + gz + 100000;
+      if (this.citadels.has(key)) return this.citadels.get(key);
+      if (this.citadels.size > 400) this.citadels.clear();
+      let res = null;
+      const s = this.seed;
+      if (N.hash2(gx, gz, s + 801) < 0.6) {
+        const cx = gx * CITADEL_CELL + 32 + Math.floor(N.hash2(gx, gz, s + 802) * (CITADEL_CELL - 64));
+        const cz = gz * CITADEL_CELL + 32 + Math.floor(N.hash2(gx, gz, s + 803) * (CITADEL_CELL - 64));
+        const by = 46, out = [];
+        const put = (x, y, z, id) => out.push(x, y, z, id | FORCE);
+        const wall = (x, y, z) => put(x, y, z, B.CINDERBRICK);
+        // corridors along X and along Z: floor, walls with windows, roof, clear interior
+        for (const axis of [0, 1]) {
+          for (let u = -24; u <= 24; u++) for (let v = -2; v <= 2; v++) {
+            const x = axis === 0 ? cx + u : cx + v, z = axis === 0 ? cz + v : cz + u;
+            put(x, by, z, (u + v) % 7 === 0 ? B.ASHSTONE : B.CINDERBRICK);
+            put(x, by + 5, z, B.CINDERBRICK);
+            for (let y = by + 1; y <= by + 4; y++) {
+              if (Math.abs(v) === 2) { if ((y === by + 2 || y === by + 3) && ((u % 6) + 6) % 6 === 3) put(x, y, z, 0); else wall(x, y, z); }
+              else put(x, y, z, 0);
+            }
+            if (Math.abs(v) === 0 && u % 8 === 0) put(x, by + 5, z, B.EMBERSTONE);          // ceiling lamps
+          }
+          for (let u = -24; u <= 24; u += 8) for (const v of [-2, 2]) {                        // piers down to the ground
+            const x = axis === 0 ? cx + u : cx + v, z = axis === 0 ? cz + v : cz + u;
+            const f = Math.min(this.floorAt(x, z), LAVA_LEVEL);
+            for (let y = Math.max(1, f); y < by; y++) wall(x, y, z);
+          }
+        }
+        // the central hall
+        for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) {
+          const x = cx + dx, z = cz + dz, edge = Math.abs(dx) === 6 || Math.abs(dz) === 6;
+          put(x, by, z, (dx + dz) % 2 === 0 ? B.CINDERBRICK : B.ASHSTONE);
+          put(x, by + 8, z, B.CINDERBRICK);
+          for (let y = by + 1; y <= by + 7; y++) {
+            const door = ((Math.abs(dx) === 6 && Math.abs(dz) <= 2) || (Math.abs(dz) === 6 && Math.abs(dx) <= 2)) && y <= by + 4;
+            if (edge && !door) wall(x, y, z); else put(x, y, z, 0);
+          }
+          if (Math.abs(dx) === 3 && Math.abs(dz) === 3) put(x, by + 8, z, B.EMBERSTONE);
+        }
+        for (const [dx, dz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) for (let y = 1; y < by; y += 1) { const f = Math.min(this.floorAt(cx + dx, cz + dz), LAVA_LEVEL); if (y >= f) wall(cx + dx, y, cz + dz); }
+        res = { x: cx, z: cz, y: by, blocks: out };
+      }
+      this.citadels.set(key, res);
+      return res;
+    }
+    placeCitadels(ch) {
+      const g0 = Math.floor((ch.x0 - 28) / CITADEL_CELL), g1 = Math.floor((ch.x0 + 15 + 28) / CITADEL_CELL);
+      const h0 = Math.floor((ch.z0 - 28) / CITADEL_CELL), h1 = Math.floor((ch.z0 + 15 + 28) / CITADEL_CELL);
+      for (let gz = h0; gz <= h1; gz++) for (let gx = g0; gx <= g1; gx++) {
+        const c = this.citadel(gx, gz);
+        if (!c) continue;
+        const l = c.blocks;
+        for (let i = 0; i < l.length; i += 4) {
+          const lx = l[i] - ch.x0, lz = l[i + 2] - ch.z0, y = l[i + 1];
+          if (lx < 0 || lx > 15 || lz < 0 || lz > 15 || y < 1 || y >= CY - 1) continue;
+          ch.blocks[lx + lz * 16 + y * 256] = l[i + 3] & 255;
+        }
+      }
+    }
+    citadelNear(x, z, r) {
+      for (let gz = Math.floor((z - r - 30) / CITADEL_CELL); gz <= Math.floor((z + r + 30) / CITADEL_CELL); gz++)
+        for (let gx = Math.floor((x - r - 30) / CITADEL_CELL); gx <= Math.floor((x + r + 30) / CITADEL_CELL); gx++) {
+          const c = this.citadel(gx, gz);
+          if (c && Math.hypot(c.x - x, c.z - z) < r + 24) return c;
+        }
+      return null;
+    }
+    findSpawn() { return { x: 0.5, y: Math.max(this.floorAt(0, 0), LAVA_LEVEL) + 2, z: 0.5 }; }
+  }
+
+  // =============================================================== the Void Isle
+  class EndGen extends RealmGen {
+    constructor(seed) {
+      super();
+      this.seed = seed | 0;
+      this.nIsle = new N.Simplex(this.seed ^ 0x3e3e);
+      this.realm = 'end';
+      this.minLight = 0.5;
+      this.pillars = [];
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        this.pillars.push({ x: Math.round(Math.cos(a) * 25), z: Math.round(Math.sin(a) * 25), h: 14 + (i % 3) * 5 });
+      }
+    }
+    radius(x, z) { return 40 + this.nIsle.noise2D(x / 18, z / 18) * 5; }
+    heightAt(x, z) { return Math.hypot(x, z) < this.radius(x, z) ? ISLE_TOP : 2; }
+    biomeAt() { return 'Void Isle'; }
+    generate(ch) {
+      const blocks = ch.blocks, s = this.seed;
+      for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+        const wx = ch.x0 + lx, wz = ch.z0 + lz, base = lx + lz * 16, d = Math.hypot(wx, wz), R = this.radius(wx, wz);
+        if (d >= R) continue;
+        const depth = Math.floor((1 - d / R) * 17 + 2 + N.hash2(wx, wz, s + 3) * 1.6);
+        for (let y = ISLE_TOP - depth; y <= ISLE_TOP; y++) blocks[base + y * 256] = B.VOIDSTONE;
+      }
+      for (const p of this.pillars) {
+        for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+          if (dx * dx + dz * dz > 5) continue;
+          const lx = p.x + dx - ch.x0, lz = p.z + dz - ch.z0;
+          if (lx < 0 || lx > 15 || lz < 0 || lz > 15) continue;
+          for (let y = ISLE_TOP + 1; y <= ISLE_TOP + p.h; y++) blocks[lx + lz * 16 + y * 256] = B.OBSIDIAN;
+          if (dx === 0 && dz === 0) blocks[lx + lz * 16 + (ISLE_TOP + p.h + 1) * 256] = B.EMBERSTONE;
+        }
+      }
+    }
+    findSpawn() { return { x: 0.5, y: ISLE_TOP + 2, z: -30.5 }; }
+  }
+
+  // =============================================================== portals
+  const AIR_OR_PORTAL = (id) => id === 0 || id === B.PORTAL;
+
+  /** The 2-4 wide, 3-5 tall rectangle of empty cells ringed by obsidian that contains (x, y, z), or null. */
+  function findFrame(world, x, y, z) {
+    for (const axis of [0, 1]) {
+      const ax = axis === 0 ? 1 : 0, az = axis === 0 ? 0 : 1;
+      if (!AIR_OR_PORTAL(world.getBlock(x, y, z))) continue;
+      const seen = new Map(), queue = [[0, 0]];
+      seen.set('0,0', true);
+      let ok = true;
+      while (queue.length && ok) {
+        const [u, v] = queue.pop();
+        for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nu = u + du, nv = v + dv, k = nu + ',' + nv;
+          if (seen.has(k)) continue;
+          const id = world.getBlock(x + nu * ax, y + nv, z + nu * az);
+          if (AIR_OR_PORTAL(id)) {
+            if (Math.abs(nu) > 5 || Math.abs(nv) > 6 || seen.size > 24) { ok = false; break; }
+            seen.set(k, true); queue.push([nu, nv]);
+          } else if (id !== B.OBSIDIAN) { ok = false; break; }
+        }
+      }
+      if (!ok) continue;
+      let u0 = 99, u1 = -99, v0 = 99, v1 = -99;
+      for (const k of seen.keys()) { const [u, v] = k.split(',').map(Number); u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+      const w = u1 - u0 + 1, h = v1 - v0 + 1;
+      if (w < 2 || w > 4 || h < 3 || h > 5 || w * h !== seen.size) continue;
+      const cells = [];
+      for (const k of seen.keys()) { const [u, v] = k.split(',').map(Number); cells.push([x + u * ax, y + v, z + u * az]); }
+      return { axis, cells };
+    }
+    return null;
+  }
+  /** Lights the frame around (x, y, z) with portal membrane. Returns the number of cells filled (0 = no frame). */
+  function light(world, x, y, z, net) {
+    const f = findFrame(world, x, y, z);
+    if (!f) return 0;
+    let n = 0;
+    for (const [cx, cy, cz] of f.cells) {
+      if (world.getBlock(cx, cy, cz) === B.PORTAL) continue;
+      if (world.setBlock(cx, cy, cz, B.PORTAL)) { if (net) net.sendBlock(cx, cy, cz, B.PORTAL); n++; }
+    }
+    return n;
+  }
+  /** After a frame block is broken: every portal cell touching (x, y, z), and all that connect to them, vanish. */
+  function collapse(world, x, y, z, net) {
+    const todo = [], seen = new Set();
+    for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
+      if (world.getBlock(x + dx, y + dy, z + dz) === B.PORTAL) todo.push([x + dx, y + dy, z + dz]);
+    let n = 0;
+    while (todo.length) {
+      const [cx, cy, cz] = todo.pop(), k = cx + ',' + cy + ',' + cz;
+      if (seen.has(k) || world.getBlock(cx, cy, cz) !== B.PORTAL) continue;
+      seen.add(k);
+      if (world.setBlock(cx, cy, cz, 0)) { if (net) net.sendBlock(cx, cy, cz, 0); n++; }
+      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) todo.push([cx + dx, cy + dy, cz + dz]);
+    }
+    return n;
+  }
+
+  /** After a frame took its eye: if the eight frames around an empty cell are all sealed, that cell becomes the Void Gate. */
+  function checkGate(world, x, y, z, net) {
+    for (let cx = x - 1; cx <= x + 1; cx++) for (let cz = z - 1; cz <= z + 1; cz++) {
+      if ((cx === x && cz === z) || world.getBlock(cx, y, cz) !== 0) continue;
+      let ok = true;
+      for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) {
+        if (!dx && !dz) continue;
+        if (world.getBlock(cx + dx, y, cz + dz) !== B.GATE_EYE) { ok = false; break; }
+      }
+      if (ok && world.setBlock(cx, y, cz, B.VOID_GATE)) { if (net) net.sendBlock(cx, y, cz, B.VOID_GATE); return true; }
+    }
+    return false;
+  }
+
+  /** The lowest cell of the portal nearest (x, z) within r blocks, with the axis its frame runs along. */
+  function findPortalNear(world, x, y, z, r) {
+    let best = null, bd = 1e9;
+    const x0 = Math.floor(x), z0 = Math.floor(z);
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      for (let yy = Math.max(2, Math.floor(y) - 40); yy < Math.min(CY - 2, Math.floor(y) + 40); yy++) {
+        if (world.getBlock(x0 + dx, yy, z0 + dz) !== B.PORTAL) continue;
+        const d = dx * dx + dz * dz + (yy - y) * (yy - y) * 0.2;
+        if (d < bd) { bd = d; best = [x0 + dx, yy, z0 + dz]; }
+      }
+    }
+    if (!best) return null;
+    let [bx, by, bz] = best;
+    while (world.getBlock(bx, by - 1, bz) === B.PORTAL) by--;
+    const axis = world.getBlock(bx + 1, by, bz) === B.PORTAL || world.getBlock(bx - 1, by, bz) === B.PORTAL ? 0 : 1;
+    return { x: bx, y: by, z: bz, axis };
+  }
+
+  /** Builds a portal shrine whose interior bottom-left cell is (x, y, z): obsidian frame (2x3 opening), platform and clear air. */
+  function buildShrine(world, x, y, z, net) {
+    const put = (px, py, pz, id) => { if (world.getBlock(px, py, pz) !== id && world.setBlock(px, py, pz, id) && net) net.sendBlock(px, py, pz, id); };
+    for (let px = x - 2; px <= x + 3; px++) for (let pz = z - 2; pz <= z + 3; pz++) {
+      put(px, y - 1, pz, B.OBSIDIAN);
+      for (let py = y; py <= y + 4; py++) put(px, py, pz, 0);
+    }
+    for (let px = x - 1; px <= x + 2; px++) for (let py = y - 1; py <= y + 3; py++) {
+      const edge = px === x - 1 || px === x + 2 || py === y - 1 || py === y + 3;
+      if (edge) put(px, py, z, B.OBSIDIAN);
+    }
+    for (let px = x; px <= x + 1; px++) for (let py = y; py <= y + 2; py++) put(px, py, z, B.PORTAL);
+    return { x, y, z, axis: 0 };
+  }
+
+  /** Where to put the player so they stand beside a portal, looking out of it. */
+  function standBeside(world, p) {
+    const nx = p.axis === 0 ? 0 : 1, nz = p.axis === 0 ? 1 : 0;
+    for (const sign of [1, -1]) {
+      const sx = p.x + 0.5 + nx * sign * 1.6 + (p.axis === 0 ? 0.5 : 0), sz = p.z + 0.5 + nz * sign * 1.6 + (p.axis === 1 ? 0.5 : 0);
+      const bx = Math.floor(sx), bz = Math.floor(sz);
+      if (world.getBlock(bx, p.y, bz) === 0 && world.getBlock(bx, p.y + 1, bz) === 0 && world.isSolid(bx, p.y - 1, bz))
+        return { x: sx, y: p.y, z: sz, yaw: Math.atan2(-nx * sign, -nz * sign) };
+    }
+    return { x: p.x + 0.5, y: p.y, z: p.z + 0.5, yaw: 0 };
+  }
+  /** Ground height for a new shrine at (x, z) in a realm (the top solid block's y + 1), or null while the chunk is missing. */
+  function groundFor(world, realm, x, z) {
+    const bx = Math.floor(x), bz = Math.floor(z);
+    if (world.getBlock(bx, 10, bz) < 0) return null;
+    if (realm === 'ember') {
+      for (let y = 100; y > 2; y--) if (world.isSolid(bx, y, bz) && !world.isSolid(bx, y + 1, bz)) return Math.max(y + 1, LAVA_LEVEL + 1);
+      return LAVA_LEVEL + 1;
+    }
+    const CUT = OM.Blocks.CUTOUT;
+    for (let y = CY - 3; y > 1; y--) {
+      const id = world.getBlock(bx, y, bz);
+      if (id > 0 && world.isSolid(bx, y, bz) && !CUT[id]) return Math.max(y + 1, OM.CONST.SEA + 2);
+    }
+    return OM.CONST.SEA + 3;
+  }
+  /** Arrival for meadow / ember travel: reuse a portal within 20 blocks of (tx, tz) or raise a new shrine there. */
+  function arrive(world, realm, tx, tz, net) {
+    let p = findPortalNear(world, tx, realm === 'ember' ? 46 : 60, tz, 20);
+    if (!p) {
+      const gy = groundFor(world, realm, tx, tz);
+      p = buildShrine(world, Math.floor(tx), gy, Math.floor(tz), net);
+    }
+    return standBeside(world, p);
+  }
+  /** The platform the player lands on in the Void Isle. */
+  function arriveEnd(world, net) {
+    for (let px = -3; px <= 3; px++) for (let pz = -34; pz <= -28; pz++) {
+      if (world.setBlock(px, ISLE_TOP, pz, B.OBSIDIAN) && net) net.sendBlock(px, ISLE_TOP, pz, B.OBSIDIAN);
+      for (let py = ISLE_TOP + 1; py <= ISLE_TOP + 4; py++) world.setBlock(px, py, pz, 0);
+    }
+    return { x: 0.5, y: ISLE_TOP + 1, z: -30.5, yaw: Math.PI };
+  }
+  /** After the final fight: a gate home appears in the middle of the island. */
+  function openExit(world, net) {
+    for (let px = -2; px <= 2; px++) for (let pz = -2; pz <= 2; pz++) {
+      const edge = Math.abs(px) === 2 || Math.abs(pz) === 2;
+      const id = edge ? B.OBSIDIAN : B.VOID_GATE;
+      world.setBlock(px, ISLE_TOP, pz, B.OBSIDIAN); world.setBlock(px, ISLE_TOP + 1, pz, id);
+      if (net) { net.sendBlock(px, ISLE_TOP + 1, pz, id); }
+    }
+  }
+
+  OM.Realms = { EmberGen, EndGen, LAVA_LEVEL, ISLE_TOP, findFrame, light, collapse, findPortalNear, checkGate, buildShrine, standBeside, arrive, arriveEnd, openExit };
 })();
 
 </script>
@@ -2703,19 +3363,21 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     }
   }
 
+  let minLight = 0.24;
   function sky(q) {
     const col = q % PA;
     const y = (q - col) / PA - 1;
     const top = padTop[col];
     if (y > top) return 1;
     const v = 1 - (top - y + 1) * 0.13;
-    return v < 0.24 ? 0.24 : v;
+    return v < minLight ? minLight : v;
   }
 
   const ao = [0, 0, 0, 0], li = [0, 0, 0, 0], tint = [1, 1, 1];
 
   function build(world, ch, uvTable, fancyLeaves) {
     fillPad(world, ch);
+    minLight = world.minLight || 0.24;
     gOpaque.reset(); gCutout.reset();
     const gen = world.gen;
     for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
@@ -2735,7 +3397,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           const nb = pad[np];
           if (nb) {
             if (OPAQUE[nb]) continue;
-            if (cut && nb === id && (id === B.GLASS || !fancyLeaves)) continue;
+            if (cut && nb === id && (id === B.GLASS || id === B.PORTAL || id === B.VOID_GATE || !fancyLeaves)) continue;
           }
           if (f === 3 && y === 0) continue;
           // ---- per-vertex AO + sky light ----
@@ -2850,6 +3512,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.edits = new Map();
       this.waterEdits = new Map();
       this.plantEdits = new Map();
+      this.realm = 'meadow';                  // which world is loaded: 'meadow', 'ember' or 'end'
+      this.realmData = { meadow: { edits: this.edits, waterEdits: this.waterEdits, plantEdits: this.plantEdits } };
+      this.minLight = 0.24;                   // the darkest a face may be shaded (caves are dark, the fire realm is not)
       this.renderDistance = opts.renderDistance || 6;
       this.plantDistance = opts.plantDistance || 4;
       this.fancyLeaves = true;
@@ -2865,6 +3530,18 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.tickTimer = 0;
       this.stats = { generated: 0, meshed: 0 };
       this.R2 = 0; this.P2 = 0;
+    }
+
+    /** Replaces the whole loaded world with another realm's terrain (each realm keeps its own player edits). */
+    switchRealm(realm, gen) {
+      for (const c of Array.from(this.chunks.values())) this.unload(c);
+      this.chunks.clear(); this.urgent.clear(); this.waterDirty.clear(); this.lastChunk = null;
+      this.realm = realm; this.gen = gen;
+      const d = this.realmData[realm] || (this.realmData[realm] = { edits: new Map(), waterEdits: new Map(), plantEdits: new Map() });
+      this.edits = d.edits; this.waterEdits = d.waterEdits; this.plantEdits = d.plantEdits;
+      this.minLight = gen.minLight || 0.24;
+      this.center = { cx: 1e9, cz: 1e9 }; this.wantedDirty = true;
+      if (this.water) this.water.pending.clear();
     }
 
     // ------------------------------------------------------------------ access
@@ -3332,7 +4009,13 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         for (const [k, mm] of m) if (mm.size) o[k] = Array.from(mm.entries()).flat();
         return o;
       };
-      return { blocks: ser(this.edits), water: ser(this.waterEdits), plants: ser(this.plantEdits) };
+      const m = this.realmData.meadow, out = { blocks: ser(m.edits), water: ser(m.waterEdits), plants: ser(m.plantEdits), realms: {} };
+      for (const k of Object.keys(this.realmData)) {
+        if (k === 'meadow') continue;
+        const r = this.realmData[k];
+        out.realms[k] = { blocks: ser(r.edits), water: ser(r.waterEdits), plants: ser(r.plantEdits) };
+      }
+      return out;
     }
     deserialize(d) {
       const de = (o, target) => {
@@ -3343,7 +4026,12 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           target.set(Number(k), m);
         }
       };
-      de(d.blocks, this.edits); de(d.water, this.waterEdits); de(d.plants, this.plantEdits);
+      const m = this.realmData.meadow;
+      de(d.blocks, m.edits); de(d.water, m.waterEdits); de(d.plants, m.plantEdits);
+      if (d.realms) for (const k of Object.keys(d.realms)) {
+        const r = this.realmData[k] || (this.realmData[k] = { edits: new Map(), waterEdits: new Map(), plantEdits: new Map() });
+        de(d.realms[k].blocks, r.edits); de(d.realms[k].water, r.waterEdits); de(d.realms[k].plants, r.plantEdits);
+      }
     }
   }
 
@@ -3927,6 +4615,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.zenith = new THREE.Color(); this.horizon = new THREE.Color();
       this.fogColor = new THREE.Color(); this.sunColor = new THREE.Color();
       this.daylight = 1; this.golden = 0;
+      this.realm = 'meadow';
       this.cloudOffset = new THREE.Vector2(Math.random() * 100, Math.random() * 100);
 
       this.material = new THREE.ShaderMaterial({
@@ -3966,13 +4655,36 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     setShadowQuality(q) {
       this.shadowQuality = q;
       const res = q === 'high' ? 2048 : 1024, ext = q === 'high' ? 72 : 46;
-      this.sun.castShadow = q !== 'off';
+      this.sun.castShadow = q !== 'off' && this.realm === 'meadow';
       this.shadowRes = res; this.shadowExtent = ext;
       const s = this.sun.shadow;
       s.mapSize.set(res, res);
       s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext;
       s.camera.updateProjectionMatrix();
       if (s.map) { s.map.dispose(); s.map = null; }
+    }
+
+    /** 'meadow' follows the day cycle; 'ember' and 'end' have fixed skies with no sun, moon or clouds. */
+    setRealm(name) {
+      this.realm = name || 'meadow';
+      this.sun.castShadow = this.realm === 'meadow' && this.shadowQuality !== 'off';
+      if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    }
+    realmLook(dt, cam) {
+      const R = REALM_LOOK[this.realm];
+      this.daylight = R.daylight; this.golden = 0;
+      this.zenith.setRGB(R.zenith[0], R.zenith[1], R.zenith[2]); this.horizon.setRGB(R.horizon[0], R.horizon[1], R.horizon[2]);
+      this.fogColor.setRGB(R.fog[0], R.fog[1], R.fog[2]); this.sunColor.setRGB(R.light[0], R.light[1], R.light[2]);
+      this.sunDir.set(0.2, -1, 0.1).normalize(); this.moonDir.copy(this.sunDir);
+      this.lightDir.set(0.35, 1, 0.25).normalize();
+      this.sun.color.copy(this.sunColor); this.sun.intensity = R.sun;
+      this.hemi.color.setRGB(R.hemi[0], R.hemi[1], R.hemi[2]); this.hemi.groundColor.setRGB(R.ground[0], R.ground[1], R.ground[2]); this.hemi.intensity = R.hemiI;
+      this.positionShadow(cam, this.lightDir);
+      this.dome.position.copy(cam);
+      const u = this.material.uniforms;
+      u.uZenith.value.copy(this.zenith); u.uHorizon.value.copy(this.horizon); u.uFogColor.value.copy(this.fogColor); u.uSunColor.value.copy(this.sunColor);
+      u.uSunDir.value.copy(this.sunDir); u.uMoonDir.value.copy(this.moonDir);
+      u.uTime.value += dt; u.uStars.value = R.stars; u.uDay.value = 0.3; u.uGolden.value = 0; u.uUnderwater.value = 0; u.uCloudCover.value = 3;
     }
 
     timeString() {
@@ -3982,6 +4694,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
     update(dt, cam, underwater) {
       if (this.cycle) this.time = (this.time + dt / this.dayLength) % 1;
+      if (this.realm !== 'meadow') { this.realmLook(dt, cam); return; }
       const ang = (this.time - 0.25) * Math.PI * 2;
       this.sunDir.set(Math.cos(ang), Math.sin(ang), 0.32).normalize();
       this.moonDir.copy(this.sunDir).negate();
@@ -4038,6 +4751,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.sun.updateMatrixWorld();
     }
   }
+
+  const REALM_LOOK = {
+    ember: { zenith: [0.22, 0.05, 0.03], horizon: [0.5, 0.13, 0.05], fog: [0.32, 0.08, 0.04], light: [1.0, 0.58, 0.32], sun: 0.55, hemi: [1.0, 0.56, 0.36], ground: [0.5, 0.18, 0.08], hemiI: 0.9, stars: 0, daylight: 0.5 },
+    end: { zenith: [0.02, 0.0, 0.07], horizon: [0.1, 0.03, 0.18], fog: [0.05, 0.02, 0.1], light: [0.72, 0.62, 1.0], sun: 0.5, hemi: [0.6, 0.52, 0.98], ground: [0.22, 0.16, 0.36], hemiI: 0.75, stars: 1, daylight: 0.45 }
+  };
 
   const SKY_VS = /* glsl */`
     varying vec3 vDir;
@@ -4724,7 +5442,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   'use strict';
   const OM = window.OM;
   const G = 32, JUMP_V = 8.9, EPS = 1e-4;
-  const LAVA = OM.B.LAVA;
+  const LAVA = OM.B.LAVA, PORTAL = OM.B.PORTAL, VOID_GATE = OM.B.VOID_GATE;
 
   class Player {
     constructor(world) {
@@ -4736,7 +5454,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.width = 0.6; this.height = 1.8; this.eye = 1.62;
       this.onGround = false; this.wasOnGround = false;
       this.submerged = 0; this.inWater = false; this.headUnder = false;
-      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;   // lava and the fire it leaves on you
+      this.inLava = false; this.lavaHead = false; this.lavaTimer = 0; this.burning = 0; this.burnTimer = 0;
+      this.inPortal = '';        // 'portal' or 'gate' while the body overlaps one (main.js turns a few seconds of that into a journey)   // lava and the fire it leaves on you
       this.sneaking = false; this.sprinting = false; this.collidedH = false; this.hitAxis = false;
       this.health = 20; this.maxHealth = 20; this.air = 15; this.maxAir = 15;
       this.fallStart = null; this.lastDamage = -100; this.regenTimer = 0; this.drownTimer = 0;
@@ -4853,6 +5572,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       if (this.inWater && !wasInWater && this.vel.y < -4 && this.onSplash) this.onSplash(-this.vel.y);
       this.inLava = this.touches(LAVA);
       this.lavaHead = this.inLava && W.getBlock(Math.floor(p.x), Math.floor(p.y + this.eye), Math.floor(p.z)) === LAVA;
+      this.inPortal = this.touches(PORTAL) ? 'portal' : this.touches(VOID_GATE) ? 'gate' : '';
 
       // stance
       const wantSneak = inp.sneak && !this.inWater;
@@ -5012,6 +5732,628 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
 </script>
 <script>
+/* Open Meadow — engine/mobs.js
+ * Creatures: original designs built from coloured boxes, with simple physics (gravity, water, lava, step-ups),
+ * a small behaviour set (wander, melee, flying shooter, fused exploder, teleporting stalker), player combat,
+ * projectiles, explosions, loot and spawning. Creatures live only on this machine (they are not synced in
+ * multiplayer), and loot goes straight into the player's bag.
+ *
+ * Model space: the creature's feet are the origin, +Y is up and +Z is the way it faces.                  */
+(function () {
+  'use strict';
+  const OM = window.OM, B = OM.B;
+  const EPS = 1e-4, MAX_HOSTILE = 9, MAX_PASSIVE = 7, FIREBALLS = 10;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const PROTECTED = new Set([B.BEDROCK, B.OBSIDIAN, B.LAVA, B.PORTAL, B.VOID_GATE, B.GATE_FRAME, B.GATE_EYE]);   // blasts never touch these
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ------------------------------------------------------------------ model building
+  const box = (cx, cy, cz, w, h, d, c) => ({ cx, cy, cz, w, h, d, c });
+  const shade = (c, k) => [Math.min(255, c[0] * k), Math.min(255, c[1] * k), Math.min(255, c[2] * k)];
+
+  /** Merges a part's boxes into one geometry with a colour per vertex. */
+  function partGeometry(boxes) {
+    const pos = [], nor = [], col = [], idx = [];
+    for (const b of boxes) {
+      const g = new THREE.BoxGeometry(b.w, b.h, b.d);
+      g.translate(b.cx, b.cy, b.cz);
+      const p = g.attributes.position, n = g.attributes.normal, base = pos.length / 3;
+      for (let i = 0; i < p.count; i++) {
+        pos.push(p.getX(i), p.getY(i), p.getZ(i));
+        nor.push(n.getX(i), n.getY(i), n.getZ(i));
+        const k = 0.94 + ((i * 7 + boxes.indexOf(b) * 13) % 5) * 0.025;
+        const c = shade(b.c, k);
+        col.push(c[0] / 255, c[1] / 255, c[2] / 255);
+      }
+      for (const i of g.index.array) idx.push(base + i);
+      g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    return geo;
+  }
+
+  // part = { name, pivot:[x,y,z], boxes:[...], glow? }   names: head, legA/legB/legC/legD, armA/armB, wingA/wingB, spin
+  const part = (name, pivot, boxes, glow) => ({ name, pivot, boxes, glow: !!glow });
+  const SKIN = [120, 142, 96], DARK = [40, 48, 44], EYE = [255, 200, 60];
+
+  function bipedModel(skin, cloth, pants, eye) {
+    return [
+      part('legA', [-0.15, 0.72, 0], [box(0, -0.36, 0, 0.28, 0.72, 0.3, pants)]),
+      part('legB', [0.15, 0.72, 0], [box(0, -0.36, 0, 0.28, 0.72, 0.3, pants)]),
+      part('body', [0, 0.72, 0], [box(0, 0.36, 0, 0.6, 0.72, 0.32, cloth)]),
+      part('armA', [-0.4, 1.38, 0], [box(0, -0.3, 0, 0.24, 0.72, 0.26, skin)]),
+      part('armB', [0.4, 1.38, 0], [box(0, -0.3, 0, 0.24, 0.72, 0.26, skin)]),
+      part('head', [0, 1.44, 0], [box(0, 0.22, 0, 0.5, 0.5, 0.5, skin)]),
+      part('eyes', [0, 1.44, 0], [box(-0.12, 0.26, 0.26, 0.1, 0.07, 0.03, eye), box(0.12, 0.26, 0.26, 0.1, 0.07, 0.03, eye)], true)
+    ];
+  }
+  function quadModel(body, head, legs, extra, eye) {
+    const L = (x, z) => [x, 0.5, z];
+    return [
+      part('legA', L(-0.28, 0.42), [box(0, -0.25, 0, 0.24, 0.5, 0.24, legs)]),
+      part('legB', L(0.28, 0.42), [box(0, -0.25, 0, 0.24, 0.5, 0.24, legs)]),
+      part('legC', L(-0.28, -0.42), [box(0, -0.25, 0, 0.24, 0.5, 0.24, legs)]),
+      part('legD', L(0.28, -0.42), [box(0, -0.25, 0, 0.24, 0.5, 0.24, legs)]),
+      part('body', [0, 0.5, 0], [box(0, 0.3, 0, 0.78, 0.62, 1.15, body)].concat(extra || [])),
+      part('head', [0, 0.78, 0.55], [box(0, 0.12, 0.2, 0.5, 0.46, 0.46, head)]),
+      part('eyes', [0, 0.78, 0.55], [box(-0.14, 0.2, 0.44, 0.1, 0.08, 0.03, eye || DARK), box(0.14, 0.2, 0.44, 0.1, 0.08, 0.03, eye || DARK)], true)
+    ];
+  }
+
+  // ------------------------------------------------------------------ the creatures
+  // ai: 'wander' | 'melee' | 'blast' | 'flyer' | 'stalker'.  drops: [item, min, max, chance]
+  const I = () => OM.I;
+  const TYPES = {
+    villager: {
+      name: 'Villager', ai: 'wander', hostile: false, health: 20, w: 0.6, h: 1.8, speed: 1.0, leash: true, talk: true,
+      model: () => bipedModel([226, 186, 152], [118, 88, 62], [74, 58, 46], [40, 28, 22]).concat([
+        part('hat', [0, 1.44, 0], [box(0, 0.5, 0, 0.78, 0.07, 0.78, [120, 78, 44]), box(0, 0.62, 0, 0.5, 0.18, 0.5, [140, 92, 52])]),
+        part('nose', [0, 1.44, 0], [box(0, 0.16, 0.3, 0.1, 0.22, 0.12, [206, 160, 128])])
+      ]),
+      drops: []
+    },
+    mossback: {
+      name: 'Mossback', ai: 'wander', hostile: false, health: 10, w: 0.9, h: 1.1, speed: 1.2,
+      model: () => quadModel([122, 92, 62], [138, 106, 72], [96, 70, 48], [box(0, 0.66, -0.05, 0.62, 0.14, 0.9, [72, 128, 52]), box(0.1, 0.76, 0.1, 0.3, 0.1, 0.3, [96, 156, 64])]),
+      drops: []
+    },
+    puffwing: {
+      name: 'Puffwing', ai: 'wander', hostile: false, health: 4, w: 0.45, h: 0.7, speed: 1.5, hop: true,
+      model: () => [
+        part('legA', [-0.1, 0.22, 0], [box(0, -0.11, 0, 0.07, 0.22, 0.07, [226, 160, 60])]),
+        part('legB', [0.1, 0.22, 0], [box(0, -0.11, 0, 0.07, 0.22, 0.07, [226, 160, 60])]),
+        part('body', [0, 0.22, 0], [box(0, 0.2, 0, 0.42, 0.4, 0.5, [244, 240, 228]), box(0, 0.22, -0.28, 0.2, 0.26, 0.14, [206, 200, 188])]),
+        part('wingA', [-0.22, 0.38, 0], [box(-0.04, 0, 0, 0.06, 0.24, 0.34, [226, 222, 210])]),
+        part('wingB', [0.22, 0.38, 0], [box(0.04, 0, 0, 0.06, 0.24, 0.34, [226, 222, 210])]),
+        part('head', [0, 0.52, 0.2], [box(0, 0.1, 0.06, 0.26, 0.26, 0.26, [250, 246, 236]), box(0, 0.06, 0.24, 0.1, 0.07, 0.1, [236, 150, 50]), box(0, 0.2, 0.04, 0.08, 0.1, 0.16, [220, 60, 50])])
+      ],
+      drops: []
+    },
+    gloomwalker: {
+      name: 'Gloomwalker', ai: 'melee', hostile: true, health: 20, w: 0.6, h: 1.9, speed: 2.1, sight: 20, reach: 1.5, damage: 3, night: true, armsOut: true,
+      model: () => bipedModel([150, 160, 172], [38, 52, 56], [30, 34, 46], [90, 240, 255]).concat([
+        part('hood', [0, 1.44, 0], [box(0, 0.26, -0.04, 0.6, 0.6, 0.58, [28, 38, 44]), box(0, 0.62, -0.02, 0.4, 0.14, 0.4, [24, 32, 38])])
+      ]),
+      drops: [['COAL', 0, 2, 0.8], ['FLINT', 1, 1, 0.12], ['IRON_INGOT', 1, 1, 0.08]]
+    },
+    hissbloom: {
+      name: 'Hissbloom', ai: 'blast', hostile: true, health: 14, w: 0.8, h: 1.5, speed: 2.5, sight: 18, reach: 2.6, damage: 0, night: true,
+      model: () => [
+        part('legA', [-0.2, 0.34, 0.2], [box(0, -0.17, 0, 0.16, 0.34, 0.16, [86, 100, 44])]),
+        part('legB', [0.2, 0.34, 0.2], [box(0, -0.17, 0, 0.16, 0.34, 0.16, [86, 100, 44])]),
+        part('legC', [-0.2, 0.34, -0.2], [box(0, -0.17, 0, 0.16, 0.34, 0.16, [86, 100, 44])]),
+        part('legD', [0.2, 0.34, -0.2], [box(0, -0.17, 0, 0.16, 0.34, 0.16, [86, 100, 44])]),
+        part('body', [0, 0.34, 0], [box(0, 0.3, 0, 0.3, 0.6, 0.3, [104, 132, 54]), box(-0.28, 0.4, 0, 0.3, 0.1, 0.18, [70, 120, 48]), box(0.28, 0.4, 0, 0.3, 0.1, 0.18, [70, 120, 48])]),
+        part('head', [0, 0.94, 0], [box(0, 0.22, 0, 0.62, 0.5, 0.62, [214, 74, 132]), box(0, 0.5, 0, 0.82, 0.12, 0.82, [236, 110, 168]),
+          box(0, 0.18, 0.4, 0.5, 0.3, 0.18, [236, 110, 168]), box(0, 0.18, -0.4, 0.5, 0.3, 0.18, [236, 110, 168]), box(0.4, 0.18, 0, 0.18, 0.3, 0.5, [236, 110, 168]), box(-0.4, 0.18, 0, 0.18, 0.3, 0.5, [236, 110, 168])]),
+        part('eyes', [0, 0.94, 0], [box(0, 0.62, 0, 0.3, 0.1, 0.3, [255, 222, 90])], true)
+      ],
+      drops: [['STICK', 0, 2, 0.7], ['COAL', 0, 1, 0.5]]
+    },
+    ashhound: {
+      name: 'Ash Hound', ai: 'melee', hostile: true, health: 16, w: 0.8, h: 1.0, speed: 3.4, sight: 22, reach: 1.4, damage: 3, fireproof: true,
+      model: () => quadModel([62, 58, 60], [74, 68, 70], [48, 44, 46], [box(0, 0.62, 0, 0.5, 0.1, 0.8, [226, 110, 40])], [255, 190, 60]),
+      drops: [['FLINT', 0, 2, 0.6], ['COAL', 0, 1, 0.4]]
+    },
+    cinderling: {
+      name: 'Cinderling', ai: 'flyer', hostile: true, health: 18, w: 0.8, h: 1.3, speed: 2.6, sight: 30, reach: 12, damage: 5, fireproof: true, flies: true,
+      model: () => [
+        part('core', [0, 0.8, 0], [box(0, 0, 0, 0.62, 0.62, 0.62, [255, 140, 36]), box(0, 0, 0, 0.36, 0.36, 0.36, [255, 236, 130])], true),
+        part('head', [0, 0.8, 0], [box(0, 0.5, 0, 0.1, 0.24, 0.1, [150, 70, 28]), box(-0.2, 0.46, 0, 0.1, 0.2, 0.1, [150, 70, 28]), box(0.2, 0.46, 0, 0.1, 0.2, 0.1, [150, 70, 28])]),
+        part('eyes', [0, 0.8, 0], [box(-0.13, 0.05, 0.32, 0.12, 0.1, 0.03, [60, 20, 10]), box(0.13, 0.05, 0.32, 0.12, 0.1, 0.03, [60, 20, 10])], true),
+        part('spin', [0, 0.8, 0], [0, 1, 2, 3, 4].map((i) => { const a = (i / 5) * Math.PI * 2; return box(Math.cos(a) * 0.2, -0.55 - (i % 2) * 0.1, Math.sin(a) * 0.2, 0.1, 0.55, 0.1, [236, 96, 24]); }), true)
+      ],
+      drops: [['EMBER_ROD', 1, 2, 0.75]]
+    },
+    void_stalker: {
+      name: 'Void Stalker', ai: 'stalker', hostile: true, health: 32, w: 0.7, h: 2.6, speed: 3.0, sight: 24, reach: 1.7, damage: 6, teleports: true,
+      model: () => [
+        part('body', [0, 0.0, 0], [box(0, 0.5, 0, 0.9, 1.0, 0.5, [34, 24, 66]), box(0, 1.3, 0, 0.62, 0.7, 0.4, [44, 30, 82]), box(0, 1.9, 0, 0.74, 0.5, 0.42, [30, 20, 58])]),
+        part('legA', [-0.2, 0.2, 0], [box(0, -0.1, 0, 0.3, 0.2, 0.34, [20, 14, 40])]),
+        part('legB', [0.2, 0.2, 0], [box(0, -0.1, 0, 0.3, 0.2, 0.34, [20, 14, 40])]),
+        part('armA', [-0.5, 2.0, 0], [box(-0.06, -0.8, 0, 0.14, 1.7, 0.16, [210, 206, 220])]),
+        part('armB', [0.5, 2.0, 0], [box(0.06, -0.8, 0, 0.14, 1.7, 0.16, [210, 206, 220])]),
+        part('head', [0, 2.1, 0], [box(0, 0.22, 0.02, 0.5, 0.56, 0.42, [226, 222, 232]), box(0, 0.5, -0.02, 0.56, 0.12, 0.46, [34, 24, 66])]),
+        part('eyes', [0, 2.1, 0], [box(0, 0.24, 0.24, 0.07, 0.34, 0.03, [200, 100, 255])], true)
+      ],
+      drops: [['VOID_PEARL', 1, 1, 0.55]]
+    },
+    starwyrm: {
+      name: 'The Starwyrm', ai: 'boss', hostile: true, health: 120, w: 3.2, h: 2.2, speed: 8, sight: 120, reach: 4.5, damage: 8, flies: true, fireproof: true, boss: true, big: true,
+      model: () => {
+        const parts = [
+          part('body', [0, 1.1, 0], [box(0, 0, 0, 1.6, 1.3, 3.4, [30, 22, 52]), box(0, 0.5, -0.4, 1.0, 0.4, 2.2, [70, 40, 120])]),
+          part('head', [0, 1.2, 2.0], [box(0, 0.1, 0.5, 1.2, 1.0, 1.4, [38, 26, 62]), box(0, -0.2, 1.1, 1.0, 0.3, 0.8, [24, 16, 40])]),
+          part('eyes', [0, 1.2, 2.0], [box(-0.42, 0.4, 1.2, 0.26, 0.18, 0.05, [230, 120, 255]), box(0.42, 0.4, 1.2, 0.26, 0.18, 0.05, [230, 120, 255])], true),
+          part('wingA', [-0.8, 1.7, 0.4], [box(-2.0, 0, 0, 4.0, 0.14, 2.4, [48, 34, 82])]),
+          part('wingB', [0.8, 1.7, 0.4], [box(2.0, 0, 0, 4.0, 0.14, 2.4, [48, 34, 82])]),
+          part('tail', [0, 1.1, -1.7], [box(0, 0, -1.6, 0.9, 0.8, 3.2, [26, 18, 44]), box(0, 0, -3.8, 0.5, 0.5, 1.6, [22, 14, 36])])
+        ];
+        return parts;
+      },
+      drops: [['DIAMOND', 4, 6, 1]]
+    }
+  };
+
+  // ------------------------------------------------------------------ physics
+  function sweepAxis(W, p, hw, h, axis, d) {
+    if (d === 0) return 0;
+    const mins = [p.x - hw, p.y, p.z - hw], maxs = [p.x + hw, p.y + h, p.z + hw];
+    const lo = mins[axis], hi = maxs[axis];
+    if (d < 0) mins[axis] += d; else maxs[axis] += d;
+    const x0 = Math.floor(mins[0] + EPS), x1 = Math.floor(maxs[0] - EPS);
+    const y0 = Math.floor(mins[1] + EPS), y1 = Math.floor(maxs[1] - EPS);
+    const z0 = Math.floor(mins[2] + EPS), z1 = Math.floor(maxs[2] - EPS);
+    let res = d;
+    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+      if (!W.isSolid(x, y, z)) continue;
+      const b = axis === 0 ? x : axis === 1 ? y : z;
+      if (d > 0) { const gap = b - hi; if (gap > -EPS && gap < res) res = Math.max(0, gap); }
+      else { const gap = b + 1 - lo; if (gap < EPS && gap > res) res = Math.min(0, gap); }
+    }
+    return res;
+  }
+
+  let uid = 1;
+  class Mob {
+    constructor(key, x, y, z, scene) {
+      const T = (this.type = TYPES[key]);
+      this.key = key; this.id = uid++;
+      this.x = x; this.y = y; this.z = z;
+      this.vx = 0; this.vy = 0; this.vz = 0;
+      this.health = T.health; this.maxHealth = T.health;
+      this.yaw = Math.random() * Math.PI * 2; this.heading = this.yaw;
+      this.age = Math.random() * 10; this.t = 0; this.moving = false; this.dir = 0;
+      this.attackCd = 1; this.hurtT = 0; this.flee = 0; this.fuse = -1; this.shootCd = rnd(1.5, 3); this.tpCd = rnd(1.5, 3.5); this.stuckT = 0; this.side = 0;
+      this.onGround = false; this.collided = false; this.deadT = -1; this.limb = 0; this.burnT = 0; this.shot = 0;
+      this.group = new THREE.Group();
+      this.mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      this.parts = {};
+      for (const p of T.model()) {
+        const m = new THREE.Mesh(partGeometry(p.boxes), p.glow ? Mob.glowMat : this.mat);
+        m.position.set(p.pivot[0], p.pivot[1], p.pivot[2]);
+        if (p.name === 'eyes') { /* eyes follow the head */ }
+        this.group.add(m);
+        (this.parts[p.name] = this.parts[p.name] || []).push(m);
+      }
+      this.group.position.set(x, y, z);
+      scene.add(this.group);
+    }
+    dispose(scene) {
+      scene.remove(this.group);
+      this.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+      this.mat.dispose();
+    }
+    get alive() { return this.deadT < 0; }
+  }
+  Mob.glowMat = null;
+
+  // ------------------------------------------------------------------ the manager
+  class Mobs {
+    constructor(world, scene, o) {
+      this.world = world; this.scene = scene; this.player = o.player; this.audio = o.audio || null;
+      this.toast = o.toast || (() => {}); this.give = o.give || (() => {});
+      this.net = null;                 // set while in a multiplayer room (explosions then spare the blocks)
+      this.list = []; this.balls = [];
+      this.target = null; this.spawnT = 2; this.realm = 'meadow'; this.daylight = 1; this.enabled = true;
+      this.onKill = null; this.onBossDeath = null; this.onHurtPlayer = null;
+      Mob.glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+      const ballGeo = new THREE.BoxGeometry(0.34, 0.34, 0.34);
+      for (let i = 0; i < FIREBALLS; i++) {
+        const m = new THREE.Mesh(ballGeo, new THREE.MeshBasicMaterial({ color: 0xff8a2a }));
+        m.visible = false; scene.add(m);
+        this.balls.push({ mesh: m, life: 0, vx: 0, vy: 0, vz: 0, dmg: 5, kind: 'fire' });
+      }
+    }
+
+    count(hostile) { let n = 0; for (const m of this.list) if (m.alive && !!m.type.hostile === hostile) n++; return n; }
+    alive() { return this.list.filter((m) => m.alive); }
+    clear() { for (const m of this.list) m.dispose(this.scene); this.list.length = 0; for (const b of this.balls) { b.life = 0; b.mesh.visible = false; } this.target = null; }
+
+    spawn(key, x, y, z) {
+      if (!TYPES[key]) return null;
+      const m = new Mob(key, x, y, z, this.scene);
+      this.list.push(m);
+      return m;
+    }
+
+    // ------------------------------------------------------------ targeting / combat
+    /** Nearest creature along a ray, within reach: { mob, t } or null. */
+    raycast(o, d, reach) {
+      let best = null;
+      for (const m of this.list) {
+        if (!m.alive) continue;
+        const hw = m.type.w / 2;
+        const min = [m.x - hw, m.y, m.z - hw], max = [m.x + hw, m.y + m.type.h, m.z + hw];
+        const org = [o.x, o.y, o.z], dir = [d.x, d.y, d.z];
+        let t0 = 0, t1 = reach, ok = true;
+        for (let a = 0; a < 3 && ok; a++) {
+          if (Math.abs(dir[a]) < 1e-9) { if (org[a] < min[a] || org[a] > max[a]) ok = false; }
+          else {
+            let ta = (min[a] - org[a]) / dir[a], tb = (max[a] - org[a]) / dir[a];
+            if (ta > tb) { const s = ta; ta = tb; tb = s; }
+            if (ta > t0) t0 = ta;
+            if (tb < t1) t1 = tb;
+            if (t0 > t1) ok = false;
+          }
+        }
+        if (ok && (!best || t0 < best.t)) best = { mob: m, t: t0 };
+      }
+      return best;
+    }
+    setTarget(m) { this.target = m && m.alive ? m : null; }
+
+    hurt(m, amount, kx, kz) {
+      if (!m.alive || m.hurtT > 0.12) return false;
+      m.health -= amount;
+      m.hurtT = 0.28;
+      m.flee = m.type.hostile ? 0 : 4;
+      const len = Math.hypot(kx, kz) || 1;
+      m.vx += (kx / len) * (m.type.big ? 2 : 6); m.vz += (kz / len) * (m.type.big ? 2 : 6); if (!m.type.flies) m.vy = Math.max(m.vy, 5);
+      if (this.audio) this.audio.play('hurt');
+      if (m.type.teleports && Math.random() < 0.45) this.teleportNear(m, 6, 12);
+      if (m.health <= 0) this.kill(m);
+      return true;
+    }
+    kill(m) {
+      m.deadT = 0;
+      for (const d of m.type.drops) {
+        if (Math.random() > d[3]) continue;
+        const n = d[1] + Math.floor(Math.random() * (d[2] - d[1] + 1));
+        const id = OM.I[d[0]];
+        if (n > 0 && id) { this.give(id, n); this.toast('+' + n + ' ' + OM.Items.get(id).name, 1100); }
+      }
+      if (this.onKill) this.onKill(m);
+      if (m.type.boss && this.onBossDeath) this.onBossDeath(m);
+    }
+
+    // ------------------------------------------------------------ projectiles and blasts
+    fireball(x, y, z, tx, ty, tz, dmg, speed) {
+      const b = this.balls.find((q) => q.life <= 0);
+      if (!b) return;
+      const dx = tx - x, dy = ty - y, dz = tz - z, len = Math.hypot(dx, dy, dz) || 1;
+      b.life = 5; b.dmg = dmg || 5;
+      b.vx = (dx / len) * (speed || 13); b.vy = (dy / len) * (speed || 13); b.vz = (dz / len) * (speed || 13);
+      b.mesh.position.set(x, y, z); b.mesh.visible = true;
+    }
+    explode(x, y, z, radius, power) {
+      const W = this.world, P = this.player;
+      const r = Math.ceil(radius);
+      if (!this.net) {                                   // single player: blocks go too (never bedrock, obsidian or lava)
+        for (let dz = -r; dz <= r; dz++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dy * dy + dz * dz > radius * radius) continue;
+          const bx = Math.floor(x) + dx, by = Math.floor(y) + dy, bz = Math.floor(z) + dz;
+          const id = W.getBlock(bx, by, bz);
+          if (id > 0 && !PROTECTED.has(id) && by > 1) {
+            if (id === B.FURNACE) OM.Furnaces.take(bx, by, bz);
+            W.setBlock(bx, by, bz, 0);
+          }
+        }
+      }
+      const d = Math.hypot(P.pos.x - x, P.pos.y + 0.9 - y, P.pos.z - z);
+      if (d < radius * 2) {
+        const amount = Math.round(power * (1 - d / (radius * 2)));
+        if (amount > 0) P.damage(amount, 'blast');
+        const k = 9 * (1 - d / (radius * 2)) / (d || 1);
+        P.vel.x += (P.pos.x - x) * k; P.vel.z += (P.pos.z - z) * k; P.vel.y = Math.max(P.vel.y, 6 * (1 - d / (radius * 2)));
+      }
+      if (this.onExplode) this.onExplode(x, y, z, radius);
+      if (this.audio) this.audio.play('break', 'stone');
+    }
+
+    teleportNear(m, rMin, rMax) {
+      const W = this.world, P = this.player.pos;
+      for (let tries = 0; tries < 14; tries++) {
+        const a = Math.random() * Math.PI * 2, r = rnd(rMin, rMax);
+        const x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+        const y = this.groundY(x, z, P.y + 8);
+        if (y !== null && this.fits(m.type, x, y, z)) { m.x = x; m.y = y; m.z = z; m.vx = m.vy = m.vz = 0; return true; }
+      }
+      return false;
+    }
+    /** Top of the ground at (x, z) seen from `fromY`, or null when it is unloaded, flooded or on fire. */
+    groundY(x, z, fromY) {
+      const W = this.world, bx = Math.floor(x), bz = Math.floor(z);
+      for (let y = Math.min(OM.CONST.CY - 3, Math.floor(fromY)); y > 2; y--) {
+        const id = W.getBlock(bx, y, bz);
+        if (id < 0) return null;
+        if (id > 0 && W.isSolid(bx, y, bz)) {
+          if (id === B.LAVA || W.getWater(bx, y + 1, bz) > 0) return null;
+          return y + 1;
+        }
+        if (id === B.LAVA) return null;
+      }
+      return null;
+    }
+    fits(T, x, y, z) {
+      const hw = T.w / 2, W = this.world;
+      for (let by = Math.floor(y + 0.01); by <= Math.floor(y + T.h - 0.01); by++)
+        for (let bz = Math.floor(z - hw); bz <= Math.floor(z + hw); bz++)
+          for (let bx = Math.floor(x - hw); bx <= Math.floor(x + hw); bx++)
+            if (W.getBlock(bx, by, bz) !== 0) return false;
+      return true;
+    }
+
+    // ------------------------------------------------------------ spawning
+    spawnTable() {
+      if (this.realm === 'ember') return { hostile: ['ashhound', 'ashhound', 'cinderling', 'cinderling', 'gloomwalker', 'void_stalker'], passive: [] };
+      if (this.realm === 'end') return { hostile: ['void_stalker', 'void_stalker', 'void_stalker'], passive: [] };
+      return { hostile: ['gloomwalker', 'gloomwalker', 'hissbloom'], passive: ['mossback', 'mossback', 'puffwing', 'puffwing', 'puffwing'] };
+    }
+    trySpawn() {
+      const P = this.player.pos, table = this.spawnTable();
+      const dark = this.realm !== 'meadow' || this.daylight < 0.32;
+      const cap = this.realm === 'meadow' ? MAX_HOSTILE : this.realm === 'end' ? 3 : MAX_HOSTILE + 3;
+      const wantHostile = dark && this.count(true) < cap && table.hostile.length;
+      const wantPassive = !dark && this.realm === 'meadow' && this.count(false) < MAX_PASSIVE && table.passive.length;
+      if (!wantHostile && !wantPassive) return;
+      const a = Math.random() * Math.PI * 2, r = rnd(this.realm === 'meadow' ? 20 : 14, 40);
+      const x = P.x + Math.cos(a) * r, z = P.z + Math.sin(a) * r;
+      if (!this.world.isAreaReady(x, z)) return;
+      let key = wantHostile ? table.hostile[Math.floor(Math.random() * table.hostile.length)] : table.passive[Math.floor(Math.random() * table.passive.length)];
+      if (key === 'cinderling') { const g = this.realmGen; if (!(g && g.citadelNear && g.citadelNear(x, z, 56))) key = 'ashhound'; }   // cinderlings keep to the citadels
+      const T = TYPES[key];
+      let y;
+      if (T.flies) { const g = this.groundY(x, z, P.y + 20); y = g === null ? null : g + rnd(3, 7); }
+      else y = this.groundY(x, z, P.y + 10);
+      if (y === null || Math.abs(y - P.y) > 24) return;
+      if (this.realm === 'meadow' && !wantHostile) { const g = this.world.getBlock(Math.floor(x), Math.floor(y) - 1, Math.floor(z)); if (g !== B.GRASS) return; }
+      if (!this.fits(T, x, y, z)) return;
+      this.spawn(key, x, y, z);
+    }
+
+    /** Keeps a few villagers walking about whenever the player is near a village. */
+    trySpawnVillager() {
+      const g = this.world.gen, P = this.player.pos;
+      const v = g.villageNear && g.villageNear(P.x, P.z, 60);
+      if (!v || this.list.filter((m) => m.alive && m.key === 'villager').length >= 4) return;
+      const a = Math.random() * Math.PI * 2, r = rnd(2, 9), x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r;
+      if (!this.world.isAreaReady(x, z)) return;
+      const y = this.groundY(x, z, v.h + 10);
+      if (y === null || Math.abs(y - v.h - 1) > 3 || !this.fits(TYPES.villager, x, y, z)) return;
+      const m = this.spawn('villager', x, y, z);
+      m.home = { x: v.x, z: v.z }; m.line = Math.floor(Math.random() * 6);
+    }
+
+    // ------------------------------------------------------------ update
+    update(dt, ctx) {
+      this.daylight = ctx.daylight; this.realm = ctx.realm || this.realm;
+      const P = this.player;
+      if (this.enabled && !P.dead) {
+        this.spawnT -= dt;
+        if (this.spawnT <= 0) { this.spawnT = rnd(1.6, 3.2); if (this.list.length < 28) this.trySpawn(); }
+      }
+      this.villagerT = (this.villagerT || 0) - dt;
+      if (this.enabled && this.realm === 'meadow' && !P.dead && this.villagerT <= 0) { this.villagerT = rnd(1.5, 3); this.trySpawnVillager(); }
+      for (let i = this.list.length - 1; i >= 0; i--) {
+        const m = this.list[i];
+        const far = Math.hypot(m.x - P.pos.x, m.z - P.pos.z);
+        if (m.alive && !m.type.boss && (far > 80 || (this.realm === 'meadow' && m.type.hostile && !m.type.fireproof && this.daylight > 0.75 && far > 24 && Math.random() < dt * 0.15))) {
+          m.dispose(this.scene); this.list.splice(i, 1); continue;
+        }
+        if (m.deadT >= 0) {
+          m.deadT += dt;
+          m.group.scale.setScalar(Math.max(0.01, 1 - m.deadT * 1.6));
+          m.group.rotation.z = Math.min(1.4, m.deadT * 4);
+          if (m.deadT > 0.7) { m.dispose(this.scene); this.list.splice(i, 1); if (this.target === m) this.target = null; }
+          continue;
+        }
+        if (!this.world.isAreaReady(m.x, m.z)) continue;
+        this.think(m, dt);
+        this.physics(m, dt);
+        this.pose(m, dt);
+      }
+      this.updateBalls(dt);
+    }
+
+    think(m, dt) {
+      const T = m.type, P = this.player, p = P.pos;
+      m.age += dt; m.hurtT = Math.max(0, m.hurtT - dt); m.attackCd -= dt; m.flee = Math.max(0, m.flee - dt);
+      const dx = p.x - m.x, dz = p.z - m.z, dy = p.y + 0.9 - (m.y + T.h * 0.5), dist = Math.hypot(dx, dz);
+      let wx = 0, wz = 0, speed = T.speed, jump = false;
+      m.wantY = null;
+      const seen = T.hostile && !P.dead && dist < (T.sight || 0);
+      if (T.ai === 'wander' || !seen) {
+        m.t -= dt;
+        if (m.t <= 0) { m.t = rnd(2, 6); m.moving = Math.random() < (T.hostile ? 0.35 : 0.6); m.dir = Math.random() * Math.PI * 2; }
+        if (m.flee > 0) { m.dir = Math.atan2(-dz, -dx); m.moving = true; speed *= 1.7; }
+        else if (T.leash && m.home && Math.hypot(m.x - m.home.x, m.z - m.home.z) > 15) { m.dir = Math.atan2(m.home.z - m.z, m.home.x - m.x); m.moving = true; }
+        if (T.talk && dist < 3.2 && !T.hostile) { m.moving = false; m.heading = Math.atan2(dx, dz); }                                  // stops to look at you
+        if (m.moving) { wx = Math.cos(m.dir); wz = Math.sin(m.dir); if (T.hostile) speed *= 0.5; }
+        if (T.flies && !seen) m.wantY = m.y;
+      } else if (T.ai === 'melee' || T.ai === 'stalker') {
+        wx = dx / (dist || 1); wz = dz / (dist || 1);
+        if (m.stuckT > 0.7) { const a = (m.side || (m.side = Math.random() < 0.5 ? 1 : -1)) * 1.25, c = Math.cos(a), s = Math.sin(a); const rx = wx * c - wz * s; wz = wx * s + wz * c; wx = rx; if (m.stuckT > 1.8) { m.stuckT = 0.3; m.side = -m.side; } }   // walled in: go round
+        if (dist < T.reach * 0.8) { wx *= 0.2; wz *= 0.2; }
+        if (dist < T.reach && Math.abs(dy) < 1.9 && m.attackCd <= 0) {
+          m.attackCd = 1.05;
+          P.damage(T.damage, 'mob');
+          P.vel.x += wx * 4; P.vel.z += wz * 4;
+          if (this.onHurtPlayer) this.onHurtPlayer(m);
+        }
+        if (T.teleports) {
+          m.tpCd -= dt;
+          if (m.tpCd <= 0 && dist > 5) { m.tpCd = rnd(3, 6); this.teleportNear(m, 2.5, 5); }
+        }
+      } else if (T.ai === 'blast') {
+        wx = dx / (dist || 1); wz = dz / (dist || 1);
+        if (m.fuse < 0 && dist < T.reach) m.fuse = 1.4;
+        if (m.fuse >= 0) {
+          m.fuse -= dt; speed *= 0.2;
+          if (dist > T.reach * 2.2) m.fuse = -1;                     // you got away
+          else if (m.fuse <= 0) { this.explode(m.x, m.y + 0.6, m.z, 3.2, 16); m.health = 0; m.deadT = 0; m.fuse = -1; return; }
+        }
+      } else if (T.ai === 'flyer') {
+        const want = Math.atan2(dz, dx) + Math.sin(m.age * 0.6) * 0.8;          // circle the player at a distance
+        const ring = dist > 9 ? 1 : dist < 5 ? -1 : 0;
+        wx = Math.cos(want + Math.PI / 2) * 0.7 + (dx / (dist || 1)) * ring * 0.9; wz = Math.sin(want + Math.PI / 2) * 0.7 + (dz / (dist || 1)) * ring * 0.9;
+        m.wantY = p.y + 3.2 + Math.sin(m.age * 1.3) * 1.2;
+        m.shootCd -= dt;
+        if (m.shootCd <= 0 && dist < T.reach + 6 && dist > 3) {
+          m.shootCd = rnd(2.1, 3.4); m.shot = 0.25;
+          this.fireball(m.x, m.y + 0.7, m.z, p.x, p.y + 1.0, p.z, T.damage, 12);
+        }
+      } else if (T.ai === 'boss') {
+        this.thinkBoss(m, dt, dx, dy, dz, dist);
+        return;
+      }
+      m.wishX = wx; m.wishZ = wz; m.speed = speed; m.jump = jump;
+      if (wx || wz) m.heading = Math.atan2(wx, wz);
+    }
+
+    thinkBoss(m, dt, dx, dy, dz, dist) {
+      const T = m.type, p = this.player.pos;
+      m.phase = (m.phase || 0) + dt;
+      // sweeping circles over the arena, with dives at the player
+      const orbit = 16 + Math.sin(m.age * 0.4) * 5;
+      m.diving = m.diving || 0;
+      let tx, ty, tz;
+      if (m.diving > 0) { m.diving -= dt; tx = p.x; ty = p.y + 1; tz = p.z; }
+      else {
+        const a = m.age * 0.35;
+        tx = (m.cx || 0) + Math.cos(a) * orbit; tz = (m.cz || 0) + Math.sin(a) * orbit; ty = (m.cy || 60) + 8 + Math.sin(m.age * 0.9) * 3;
+        m.diveCd = (m.diveCd === undefined ? 6 : m.diveCd) - dt;
+        if (m.diveCd <= 0) { m.diveCd = rnd(7, 11); m.diving = 3.2; }
+        m.shootCd -= dt;
+        if (m.shootCd <= 0 && dist < 40) { m.shootCd = rnd(2.6, 4); this.fireball(m.x, m.y + 1, m.z, p.x, p.y + 1, p.z, 6, 14); }
+      }
+      const ddx = tx - m.x, ddy = ty - m.y, ddz = tz - m.z, dl = Math.hypot(ddx, ddy, ddz) || 1;
+      const sp = m.diving > 0 ? 11 : T.speed * 0.7;
+      m.vx += ((ddx / dl) * sp - m.vx) * (1 - Math.exp(-1.6 * dt));
+      m.vy += ((ddy / dl) * sp - m.vy) * (1 - Math.exp(-1.6 * dt));
+      m.vz += ((ddz / dl) * sp - m.vz) * (1 - Math.exp(-1.6 * dt));
+      m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt;
+      if (Math.abs(m.vx) + Math.abs(m.vz) > 0.1) m.heading = Math.atan2(m.vx, m.vz);
+      if (dist < T.reach + 1.2 && Math.abs(dy) < 3 && m.attackCd <= 0) {
+        m.attackCd = 1.4; this.player.damage(T.damage, 'mob');
+        this.player.vel.x += (dx / (dist || 1)) * 8; this.player.vel.z += (dz / (dist || 1)) * 8; this.player.vel.y = Math.max(this.player.vel.y, 5);
+      }
+      m.wishX = m.wishZ = 0; m.boss = true;
+    }
+
+    physics(m, dt) {
+      const T = m.type, W = this.world, hw = T.w / 2;
+      if (m.boss) return;                                        // the boss flies freely
+      const inWater = W.getWater(Math.floor(m.x), Math.floor(m.y + 0.3), Math.floor(m.z)) > 0;
+      const inLava = W.getBlock(Math.floor(m.x), Math.floor(m.y + 0.2), Math.floor(m.z)) === B.LAVA;
+      const wx = m.wishX || 0, wz = m.wishZ || 0;
+      let speed = (m.speed || 0) * (inWater ? 0.55 : 1) * (m.fuse >= 0 ? 0.25 : 1);
+      // do not walk into lava, deep water or (when peaceful) off a tall ledge
+      if ((wx || wz) && !T.flies) {
+        const ax = Math.floor(m.x + wx * 0.9), az = Math.floor(m.z + wz * 0.9);
+        let gy = Math.floor(m.y), drop = 0;
+        while (gy > 1 && W.getBlock(ax, gy - 1, az) === 0 && drop < 6) { gy--; drop++; }
+        const ground = W.getBlock(ax, gy - 1, az);
+        if (ground === B.LAVA || W.getBlock(ax, Math.floor(m.y), az) === B.LAVA || (drop > (T.hostile && m.attackCd < 5 ? 3 : 1) && !m.flee)) { speed = 0; m.moving = false; m.t = 0; }
+      }
+      if (T.flies) {
+        const want = m.wantY === null || m.wantY === undefined ? m.y : m.wantY;
+        m.vy += clamp((want - m.y) * 2.2 - m.vy, -6, 6) * (1 - Math.exp(-3 * dt));
+        const k = 1 - Math.exp(-2.4 * dt);
+        m.vx += (wx * speed - m.vx) * k; m.vz += (wz * speed - m.vz) * k;
+      } else {
+        const k = 1 - Math.exp(-(m.onGround ? 14 : 3) * dt);
+        m.vx += (wx * speed - m.vx) * k; m.vz += (wz * speed - m.vz) * k;
+        m.vy -= 30 * dt;
+        if (inWater) m.vy += 44 * dt * (m.vy < 1.5 ? 1 : 0.2) - m.vy * 3 * dt;
+        if (inLava) m.vy += 30 * dt;
+        if (m.vy < -50) m.vy = -50;
+        if ((wx || wz) && m.collided && m.onGround && speed > 0) m.vy = T.hop ? 7.5 : 8.6;
+        else if (T.hop && m.onGround && (wx || wz) && Math.random() < dt * 2.5) m.vy = 6.5;
+      }
+      const p = { x: m.x, y: m.y, z: m.z };
+      const dy = sweepAxis(W, p, hw, T.h, 1, m.vy * dt);
+      m.onGround = false;
+      if (dy !== m.vy * dt) { if (m.vy < 0) m.onGround = true; m.vy = 0; }
+      m.y += dy; p.y = m.y;
+      m.collided = false;
+      const wasStuck = m.stuckT;
+      const mx = sweepAxis(W, p, hw, T.h, 0, m.vx * dt);
+      if (mx !== m.vx * dt) { m.collided = true; m.vx = 0; }
+      m.x += mx; p.x = m.x;
+      const mz = sweepAxis(W, p, hw, T.h, 2, m.vz * dt);
+      if (mz !== m.vz * dt) { m.collided = true; m.vz = 0; }
+      m.z += mz;
+      m.stuckT = m.collided && (wx || wz) ? m.stuckT + dt : Math.max(0, wasStuck - dt * 2);
+      if (m.y < 1) { m.y = 1; m.vy = 0; }
+      if (inLava && !T.fireproof) { m.burnT += dt; if (m.burnT >= 0.5) { m.burnT = 0; this.hurt(m, 3, 0, 0); m.hurtT = 0; } }
+    }
+
+    pose(m, dt) {
+      const T = m.type;
+      // turn smoothly toward where it is heading
+      let d = m.heading - m.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      m.yaw += d * Math.min(1, dt * 9);
+      const g = m.group;
+      g.position.set(m.x, m.y, m.z);
+      g.rotation.set(0, m.yaw, 0);
+      g.scale.setScalar(1);
+      const sp = Math.hypot(m.vx, m.vz);
+      m.limb += dt * (3 + sp * 3.2);
+      const sw = Math.sin(m.limb) * Math.min(1, sp / 1.6) * 0.9;
+      const set = (name, rx) => { const a = m.parts[name]; if (a) for (const mesh of a) mesh.rotation.x = rx; };
+      set('legA', sw); set('legB', -sw); set('legC', -sw); set('legD', sw);
+      if (T.armsOut) { set('armA', -1.35 + sw * 0.15); set('armB', -1.35 - sw * 0.15); } else { set('armA', -sw * 0.8); set('armB', sw * 0.8); }
+      const flap = Math.sin(m.age * (T.flies ? 14 : 20));
+      if (m.parts.wingA) for (const w of m.parts.wingA) w.rotation.z = T.big ? flap * 0.5 : (sp > 0.3 || !m.onGround ? flap * 0.5 : 0);
+      if (m.parts.wingB) for (const w of m.parts.wingB) w.rotation.z = T.big ? -flap * 0.5 : (sp > 0.3 || !m.onGround ? -flap * 0.5 : 0);
+      if (m.parts.spin) for (const s of m.parts.spin) s.rotation.y = m.age * 2.4;
+      if (m.parts.core) for (const c of m.parts.core) c.scale.setScalar(1 + Math.sin(m.age * 6) * 0.08);
+      // flash red when hurt; flash white while a fuse burns
+      const flash = m.hurtT > 0 ? m.hurtT / 0.28 : 0, fuse = m.fuse >= 0 ? (Math.sin(m.age * 26) > 0 ? 0.9 : 0) : 0;
+      m.mat.emissive.setRGB(flash * 0.8 + fuse, flash * 0.1 + fuse, flash * 0.1 + fuse);
+      if (m.fuse >= 0) g.scale.setScalar(1 + (1.4 - m.fuse) * 0.18);
+      m.shot = Math.max(0, m.shot - dt);
+    }
+
+    updateBalls(dt) {
+      const W = this.world, P = this.player, p = P.pos;
+      for (const b of this.balls) {
+        if (b.life <= 0) continue;
+        b.life -= dt;
+        const m = b.mesh.position;
+        m.x += b.vx * dt; m.y += b.vy * dt; m.z += b.vz * dt;
+        b.mesh.rotation.x += dt * 8; b.mesh.rotation.y += dt * 6;
+        const hitBlock = W.isSolid(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z));
+        const hitPlayer = !P.dead && Math.abs(m.x - p.x) < 0.5 && Math.abs(m.z - p.z) < 0.5 && m.y > p.y - 0.2 && m.y < p.y + P.height + 0.2;
+        if (hitPlayer) { P.damage(b.dmg, 'fire'); P.burning = Math.max(P.burning, 4); }
+        if (hitBlock || hitPlayer || b.life <= 0) { b.life = 0; b.mesh.visible = false; }
+      }
+    }
+  }
+
+  OM.Mobs = Mobs;
+  OM.MobTypes = TYPES;
+})();
+
+</script>
+<script>
 /* Open Meadow — engine/interaction.js
  * Everything the player does to the world with the mouse:
  *   - targeting (voxel ray cast, plants included) with an outline box
@@ -5033,10 +6375,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       this.net = null;     // OM.Net while in a multiplayer room: every player-made change is also sent to the server
       this.remote = null;  // OM.RemotePlayers: blocks may not be placed inside another player
       this.onUse = null;   // (blockId, x, y, z) => void — right-clicking a crafting table or furnace
+      this.mobs = null;    // OM.Mobs: a creature under the crosshair is attacked instead of mined
       this.dir = new THREE.Vector3();
       this.target = null;
       this.mining = false; this.progress = 0; this.mx = 0; this.my = 0; this.mz = 0;
-      this.cooldown = 0; this.placeRepeat = 0;
+      this.cooldown = 0; this.placeRepeat = 0; this.igniterCd = 0; this.eyeCd = 0; this.eye = null; this.eyeMesh = null;
       this.swingT = 1; this.swingLoop = false;
       this.heldId = -1;
 
@@ -5109,7 +6452,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         { plants: true, water: !!(item && item.kind === 'bucket') }) : null;
       this.target = hit;
 
-      if (hit && hit.kind !== 'water') {
+      // a creature nearer than any block is hit instead of mined
+      let mobHit = null;
+      if (active && this.mobs) {
+        const m = this.mobs.raycast(cam.position, this.dir, 4.2);
+        if (m && (!hit || m.t < hit.t)) mobHit = m;
+      }
+      if (this.mobs) this.mobs.setTarget(mobHit ? mobHit.mob : null);
+
+      if (hit && hit.kind !== 'water' && !mobHit) {
         this.outline.visible = true;
         if (hit.kind === 'plant') {
           const b = hit.box;
@@ -5123,7 +6474,16 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
       this.cooldown -= dt;
       this.placeRepeat -= dt;
-      if (active && input.mouseLeft && hit && hit.kind !== 'water') {
+      this.igniterCd -= dt;
+      this.eyeCd -= dt;
+      this.updateEye(dt);
+      if (mobHit && mobHit.mob.type.talk) {
+        this.resetMining();
+        if (active && input.rightPressed) this.talk(mobHit.mob);
+      } else if (mobHit) {
+        this.resetMining();
+        if (input.mouseLeft && this.cooldown <= 0) { this.attack(mobHit.mob); this.cooldown = 0.42; }
+      } else if (active && input.mouseLeft && hit && hit.kind !== 'water') {
         if (hit.kind === 'plant') {
           if (this.cooldown <= 0) {
             if (W.removePlant(hit.x, hit.y, hit.z, 'player') && this.net) this.net.sendPlant(hit.x, hit.y, hit.z, 0);
@@ -5154,7 +6514,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         this.textures.cracks.offset.x = Math.min(9, Math.floor(this.progress * 10)) / 10;
       } else this.crack.visible = false;
 
-      if (active && (input.rightPressed || (input.mouseRight && this.placeRepeat <= 0))) {
+      if (active && !(mobHit && mobHit.mob.type.talk) && (input.rightPressed || (input.mouseRight && this.placeRepeat <= 0))) {
         this.place(hit, item, stack);
         this.placeRepeat = input.rightPressed ? 0.3 : 0.2;
       }
@@ -5172,9 +6532,40 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       const drop = mine.drops ? OM.Crafting.dropFor(hit.block) : 0;
       if (drop) this.give(drop, 1);
       if (hit.block === OM.B.FURNACE) for (const s of OM.Furnaces.take(hit.x, hit.y, hit.z)) this.give(s.id, s.count);   // its contents are never lost
+      if (hit.block === OM.B.OBSIDIAN) OM.Realms.collapse(this.world, hit.x, hit.y, hit.z, this.net);   // a broken frame puts its portal out
       this.wearTool();
       this.burst(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, def.color, 16, 1);
       if (this.audio) this.audio.play('break', def.sound);
+    }
+
+    /** A villager's advice: a hint about the next step of the adventure, in rotation. */
+    talk(m) {
+      const tips = [
+        'Stone needs a pickaxe, iron needs a stone one, and diamonds an iron one. Dig deep for diamonds.',
+        'Lava lakes lie on the surface and buried in the deep. Pour water on lava and it turns to obsidian.',
+        'Obsidian takes a diamond pickaxe. Frame a doorway of it, 4 wide and 5 tall, and light it with an igniter — flint and iron.',
+        'The Ashlands are a world of lava and ash. Their cinder-brick citadels are home to cinderlings that carry ember rods.',
+        'Void stalkers drop pearls. An ember rod and a pearl make a seeker eye.',
+        'A seeker eye drifts toward a buried vault. Eight gate frames, eight eyes — then the Void Gate opens.',
+        'The dragon of the Void Isle circles above. Bring a sword and strike it when it dives at you.'
+      ];
+      m.line = ((m.line || 0) + 1) % tips.length;
+      this.toast('Villager: ' + tips[m.line], 5200);
+      this.swing(false);
+      if (this.audio) this.audio.play('pop');
+    }
+
+    /** One blow at a creature with whatever is in hand. */
+    attack(mob) {
+      const stack = this.inventory.selectedItem(), id = stack ? stack.id : 0;
+      const dmg = OM.Crafting.weaponDamage(id);
+      if (!this.mobs.hurt(mob, dmg, this.dir.x, this.dir.z)) return;
+      this.swing(false);
+      this.burst(mob.x, mob.y + mob.type.h * 0.6, mob.z, [200, 40, 30], 7, 0.6);
+      const item = stack ? OM.Items.get(stack.id) : null;
+      if (item && item.kind === 'tool' && this.inventory.damageSelected(item.tool === 'sword' ? 1 : 2)) {
+        this.toast('Your ' + item.name + ' broke');
+      }
     }
 
     /** Breaking a block costs the held tool one use (a sword two); a tool at zero is gone. */
@@ -5194,6 +6585,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         return;
       }
       if (!item) return;
+      if (item.kind === 'seeker') { this.useSeeker(hit); return; }
+      if (item.kind === 'igniter') {
+        if (hit && hit.kind === 'block' && this.igniterCd <= 0) { this.igniterCd = 0.7; this.useIgniter(hit.x + hit.nx, hit.y + hit.ny, hit.z + hit.nz); }
+        return;
+      }
       if (item.kind === 'bucket') {
         if (hit && hit.kind === 'water' && W.setWater(hit.x, hit.y, hit.z, 0)) {
           if (this.net) this.net.sendWater(hit.x, hit.y, hit.z, 0);
@@ -5243,6 +6639,70 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
           this.quenchLavaAround(tx, ty, tz);                  // water that touches lava hardens it
         }
       }
+    }
+
+    /** A seeker eye either seals a gate frame (right-click the frame) or drifts toward the nearest vault. */
+    useSeeker(hit) {
+      const W = this.world;
+      if (hit && hit.kind === 'block' && hit.block === OM.B.GATE_FRAME) {
+        if (W.setBlock(hit.x, hit.y, hit.z, OM.B.GATE_EYE)) {
+          if (this.net) this.net.sendBlock(hit.x, hit.y, hit.z, OM.B.GATE_EYE);
+          this.inventory.consumeSelected(1);
+          this.swing(false);
+          this.burst(hit.x + 0.5, hit.y + 1.1, hit.z + 0.5, [110, 255, 200], 12, 0.8);
+          if (this.audio) this.audio.play('place', 'stone');
+          this.toast(OM.Realms.checkGate(W, hit.x, hit.y, hit.z, this.net) ? 'The Void Gate opens!' : 'The frame takes the eye', 2400);
+        }
+        return;
+      }
+      if (this.eyeCd > 0 || this.eye) return;
+      if (W.realm !== 'meadow') { this.toast('The eye only answers in the meadow world'); return; }
+      const p = this.player.pos, v = W.gen.nearestVault(p.x, p.z);
+      if (!v) return;
+      const dx = v.x - p.x, dz = v.z - p.z, d = Math.hypot(dx, dz) || 1;
+      this.inventory.consumeSelected(1);
+      this.eyeCd = 1.2;
+      this.eye = { x: p.x, y: p.y + 1.7, z: p.z, ux: dx / d, uz: dz / d, t: 0, near: d < 28, trail: 0 };
+      if (!this.eyeMesh) {
+        this.eyeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0x66ffcc }));
+        this.scene.add(this.eyeMesh);
+      }
+      this.eyeMesh.visible = true;
+      this.eyeMesh.position.set(this.eye.x, this.eye.y, this.eye.z);
+      const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+      const dir = names[((Math.round(Math.atan2(dx, -dz) / (Math.PI / 4)) % 8) + 8) % 8];
+      this.toast(this.eye.near ? 'The eye sinks into the ground — a vault lies right below. Dig down!' : 'The eye drifts ' + dir + '…', 2600);
+      this.swing(false);
+    }
+    updateEye(dt) {
+      const e = this.eye;
+      if (!e) return;
+      e.t += dt;
+      const dur = 2.4, k = Math.min(1, e.t / dur);
+      e.x += e.ux * 8 * dt; e.z += e.uz * 8 * dt;
+      e.y = (this.player.pos.y + 1.7) + (e.near ? -k * k * 5 + Math.sin(k * 3) * 1.2 : Math.sin(k * Math.PI) * 4.5);
+      this.eyeMesh.position.set(e.x, e.y, e.z);
+      this.eyeMesh.rotation.y += dt * 6;
+      e.trail -= dt;
+      if (e.trail <= 0) { e.trail = 0.07; this.burst(e.x, e.y, e.z, [110, 255, 200], 1, 0.15); }
+      if (e.t >= dur) {
+        this.eyeMesh.visible = false;
+        this.eye = null;
+        if (Math.random() < 0.72) { this.give(OM.I.SEEKER, 1); this.toast('The eye drifts back to you'); }
+        else { this.burst(e.x, e.y, e.z, [110, 255, 200], 16, 1); this.toast('The eye shatters'); }
+      }
+    }
+
+    /** Lights an obsidian frame whose opening contains the cell (x, y, z). */
+    useIgniter(x, y, z) {
+      const n = OM.Realms.light(this.world, x, y, z, this.net);
+      this.swing(false);
+      if (n > 0) {
+        this.toast('The portal hums to life');
+        this.burst(x + 0.5, y + 1, z + 0.5, [190, 110, 255], 14, 1.2);
+        if (this.audio) this.audio.play('splash', 'small');
+        if (this.inventory.damageSelected(1)) this.toast('Your Igniter wore out');
+      } else this.toast('Nothing catches — you need a closed obsidian frame, at least 4 wide and 5 tall outside', 2200);
     }
 
     /** Lava cools to obsidian where water touches it. Returns how many blocks changed. */
@@ -6946,6 +8406,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       seed, scene: G.scene, textures: G.textures, materials: G.materials,
       renderDistance: G.settings.renderDistance, plantDistance: plantDistanceFor(G.settings)
     });
+    G.gens = { meadow: G.world.gen, ember: new OM.Realms.EmberGen(seed ^ 0x5eed), end: new OM.Realms.EndGen(seed ^ 0xe11d) };
+    G.realm = 'meadow'; G.travel = null; G.portalT = 0; G.portalCool = 0; G.fade = 0; G.gatePos = null;
+    G.endState = { bossDead: false, bossHealth: null }; G.endingTimer = -1;
     G.water = new OM.Water(G.world);
     G.world.water = G.water;
     G.materials.water = G.water.createMaterial(G.textures);
@@ -6971,6 +8434,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
       if (block === OM.B.CRAFTING_TABLE) openInventory('table');
       else if (block === OM.B.FURNACE) openInventory('furnace', OM.Furnaces.at(x, y, z));
     };
+    G.mobs = new OM.Mobs(G.world, G.scene, { player: G.player, audio: G.audio, toast, give: (id, n) => G.interaction.give(id, n) });
+    G.mobs.onBossDeath = () => { G.endState.bossDead = true; G.endState.bossHealth = null; G.endingTimer = 2.8; OM.Realms.openExit(G.world, null); };
+    G.interaction.mobs = G.mobs;
     hookPlayer();
 
     OM.Furnaces.clear();
@@ -6982,6 +8448,9 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     } else if (save) {
       try { G.world.deserialize(save.world || {}); } catch (e) { console.warn('[OpenMeadow] world edits could not be restored', e); }
       if (!G.inventory.deserialize(save.inventory)) G.inventory.starterKit();
+      if (save.realm && G.gens[save.realm] && save.realm !== 'meadow') setRealm(save.realm);
+      G.gatePos = save.gatePos || null;
+      if (save.end) G.endState = { bossDead: !!save.end.bossDead, bossHealth: save.end.bossHealth || null };
       OM.Furnaces.deserialize(save.furnaces);
     } else G.inventory.starterKit();
 
@@ -7013,7 +8482,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     P.onDeath = (cause) => {
       const msg = {
         fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.',
-        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.'
+        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.', mob: 'A creature got you.', blast: 'You were blown up.'
       }[cause] || 'You blacked out.';
       $('death-reason').textContent = msg;
       if (cause === 'void') { respawn(); toast('You fell out of the world — back to the meadow.'); return; }
@@ -7045,6 +8514,15 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   function respawn() {
     G.player.resetVitals();
     G.interaction.resetMining();
+    G.mobs.clear();
+    G.travel = null; G.portalT = 0;
+    if (G.realm === 'end') {                                  // a fall or a bite in the Void Isle only costs the walk back: you wake on the arrival platform
+      const spot = OM.Realms.arriveEnd(G.world, null);
+      G.player.spawnAt(spot.x, spot.y, spot.z); G.player.yaw = spot.yaw; G.player.pitch = -0.1;
+      G.mobs.clear(); spawnBoss();
+      return;
+    }
+    if (G.realm !== 'meadow') setRealm('meadow');
     placePlayer(spawnPoint());
     G.player.yaw = Math.random() * Math.PI * 2;
     G.player.pitch = -0.1;
@@ -7056,8 +8534,10 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     show('loading-screen', s === 'loading');
     show('menu-screen', s === 'menu');
     show('pause-screen', s === 'paused');
+    if (s === 'paused') show('pause-backup-row', !G.mp);
     show('death-screen', s === 'dead');
     show('hud', s === 'playing' || s === 'inventory' || s === 'chat');
+    show('ending-screen', s === 'ending');
     if (s !== 'menu' && s !== 'paused') { show('settings-screen', false); show('controls-screen', false); show('mp-screen', false); }
     document.body.classList.toggle('in-game', s === 'playing');
     if (s !== 'playing') { clearInput(); setLockHint(false); }
@@ -7067,6 +8547,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     if (s === 'menu') {
       $('btn-start').textContent = G.started || G.save ? 'Continue' : 'Start Game';
       show('btn-new', !G.mp);
+      show('menu-backup-row', !G.mp);
       show('btn-leave-mp', !!G.mp);
     }
     if (s === 'paused' && G.started) saveGame(true);
@@ -7262,7 +8743,11 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     bindClick('btn-settings-back', () => closeSub('settings-screen'));
     bindClick('btn-controls-back', () => closeSub('controls-screen'));
     bindClick('btn-respawn', () => { respawn(); resume(); });
+    bindClick('btn-export', exportWorld); bindClick('btn-menu-export', exportWorld);
+    bindClick('btn-import', () => $('import-file').click()); bindClick('btn-menu-import', () => $('import-file').click());
+    $('import-file').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; importWorld(f); });
     bindClick('inv-close', () => closeInventory(false));
+    bindClick('btn-ending-continue', resume);
     bindClick('lock-hint-btn', () => { G.lockFailures = 0; requestLock(); });
     bindClick('btn-multiplayer', () => {
       openSub('mp-screen', 'menu-screen');
@@ -7384,6 +8869,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     G.world.loadRemoteEdits(welcome.edits);
     G.remote = new OM.RemotePlayers(G.scene);
     G.interaction.net = net;
+    G.mobs.net = net;     // explosions spare the blocks in shared worlds
     G.interaction.remote = G.remote;
     for (const p of welcome.players) G.remote.add(p);
     net.onJoin = (p) => { G.remote.add(p); refreshPlayers(); };
@@ -7453,6 +8939,116 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     try { const d = JSON.parse(store.get(mpSaveKey()) || 'null'); return d && d.version === 1 ? d : null; } catch (e) { return null; }
   }
 
+  // ---------------------------------------------------------------- realms
+  /** Swaps the loaded world, sky, creatures and furnace keys over to another realm. */
+  function setRealm(to) {
+    G.realm = to;
+    OM.Furnaces.realm = to;
+    G.world.switchRealm(to, G.gens[to]);
+    G.sky.setRealm(to);
+    G.mobs.clear();
+    G.mobs.realm = to; G.mobs.realmGen = G.gens[to];
+    G.interaction.resetMining();
+    applyFog();
+  }
+  /** kind: 'portal' (meadow <-> the Ashlands, 8 blocks there are 1 here) or 'gate' (a vault gate <-> the Void Isle). */
+  function startTravel(kind) {
+    const P = G.player;
+    if (G.mp) { toast('Portals only work in single-player worlds for now'); G.portalCool = 6; return; }
+    let to, tx, tz;
+    if (kind === 'portal') {
+      to = G.realm === 'meadow' ? 'ember' : 'meadow';
+      tx = to === 'ember' ? P.pos.x / 8 : P.pos.x * 8; tz = to === 'ember' ? P.pos.z / 8 : P.pos.z * 8;
+    } else if (G.realm === 'end') {
+      to = 'meadow'; const g = G.gatePos || { x: G.spawn.x, y: G.spawn.y, z: G.spawn.z }; tx = g.x; tz = g.z;
+    } else { to = 'end'; G.gatePos = { x: P.pos.x, y: P.pos.y, z: P.pos.z }; tx = 0.5; tz = -30.5; }
+    setRealm(to);
+    G.travel = { to, kind, tx, tz, t: 0 };
+    P.vel.set(0, 0, 0); P.burning = 0;
+    P.spawnAt(tx, to === 'end' ? 80 : 70, tz);
+    $('portal-text').textContent = to === 'ember' ? 'Crossing into the Ashlands…' : to === 'end' ? 'Falling toward the Void Isle…' : 'Returning to the meadow…';
+  }
+  function finishTravel() {
+    const T = G.travel, W = G.world, P = G.player;
+    let spot;
+    if (T.to === 'end') spot = OM.Realms.arriveEnd(W, null);
+    else if (T.kind === 'gate') spot = G.gatePos ? { x: G.gatePos.x, y: G.gatePos.y, z: G.gatePos.z + 3, yaw: 0 } : (() => { const s = spawnPoint(); return { x: s.x, y: s.y, z: s.z, yaw: 0 }; })();   // beside the gate, not inside it
+    else spot = OM.Realms.arrive(W, T.to, T.tx, T.tz, null);
+    P.spawnAt(spot.x, spot.y, spot.z);
+    if (T.kind === 'gate' && T.to === 'meadow') placePlayer({ x: spot.x, y: spot.y, z: spot.z, exact: true });
+    P.yaw = spot.yaw; P.pitch = -0.05; P.vel.set(0, 0, 0);
+    G.travel = null; G.portalT = 0; G.portalCool = 3.5; G.fade = 1;
+    if (T.to === 'end') spawnBoss();
+    toast(T.to === 'ember' ? 'The Ashlands — lava below, fire above' : T.to === 'end' ? 'The Void Isle' : 'Home again', 2200);
+    saveGame(true);
+  }
+  function spawnBoss() {
+    if (G.endState.bossDead || G.mobs.alive().some((m) => m.type.boss)) return;
+    const m = G.mobs.spawn('starwyrm', 0, OM.Realms.ISLE_TOP + 16, 0);
+    m.cx = 0; m.cz = 0; m.cy = OM.Realms.ISLE_TOP;
+    if (G.endState.bossHealth) m.health = Math.max(1, Math.min(m.maxHealth, G.endState.bossHealth));
+  }
+  function updatePortals(dt) {
+    const P = G.player, po = $('portal-overlay');
+    if (G.travel) {
+      G.travel.t += dt;
+      let ready = true;
+      for (let dz = -2; dz <= 2 && ready; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const c = G.world.getChunk((Math.floor(G.travel.tx) >> 4) + dx, (Math.floor(G.travel.tz) >> 4) + dz);
+        if (!c || !c.generated) { ready = false; break; }
+      }
+      if (ready || G.travel.t > 25) finishTravel();
+    } else if (P.inPortal && !P.dead) {
+      if (G.portalCool <= 0) { G.portalT += dt; if (G.portalT >= 2.2) { G.portalT = 0; startTravel(P.inPortal); } }
+    } else G.portalT = Math.max(0, G.portalT - dt * 3);
+    G.portalCool = Math.max(0, G.portalCool - dt);
+    let a = 0;
+    if (G.travel) a = 1;
+    else if (G.fade > 0) { G.fade = Math.max(0, G.fade - dt * 0.8); a = G.fade; }
+    else if (P.inPortal && G.portalCool <= 0) a = Math.min(0.85, G.portalT / 2.2);
+    po.style.opacity = a.toFixed(2);
+    $('portal-text').style.opacity = G.travel ? '1' : '0';
+  }
+
+  // ---------------------------------------------------------------- backups
+  /** The whole single-player save (world edits in every realm, inventory, furnaces, progress) as a text file. */
+  function exportText() {
+    if (G.started && !G.mp) saveGame(true);
+    return store.get(SAVE_KEY);
+  }
+  function exportWorld() {
+    if (G.mp) { toast('In a multiplayer room the world lives on the server — there is nothing to export here'); return; }
+    const text = exportText();
+    if (!text) { toast('Play for a moment first, so there is something to back up'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'open-meadow-world-' + (G.seed || 'save') + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('World exported (' + Math.max(1, Math.round(text.length / 1024)) + ' KB) — keep the file somewhere safe', 3200);
+  }
+  /** Validates a backup and makes it the saved world; the page then reloads into it. Returns an error text or '' on success. */
+  function importText(text) {
+    let d;
+    try { d = JSON.parse(text); } catch (e) { return 'That file is not a world backup (it is not valid JSON).'; }
+    if (!d || d.version !== 1 || !Number.isFinite(d.seed) || !d.inventory || !Array.isArray(d.inventory.slots) || !d.world || typeof d.world !== 'object') return 'That file is not an Open Meadow world backup.';
+    if (!store.set(SAVE_KEY, JSON.stringify(d))) return 'Your browser has no room to store that world.';
+    G.started = false;                                    // so the unload handler does not overwrite it with the old world
+    window.location.reload();
+    return '';
+  }
+  function importWorld(file) {
+    if (G.mp) { toast('Leave the multiplayer room first — imports replace your single-player world'); return; }
+    if (!file) return;
+    if (file.size > 30 * 1024 * 1024) { toast('That file is too large to be a world backup'); return; }
+    if (!window.confirm('Replace your current world with "' + file.name + '"? The world you have now will be overwritten.')) return;
+    const r = new FileReader();
+    r.onload = () => { const err = importText(String(r.result)); if (err) toast(err, 3600); };
+    r.onerror = () => toast('The file could not be read');
+    r.readAsText(file);
+  }
+  G.exportText = exportText; G.importText = importText;
+
   // ---------------------------------------------------------------- saving
   function saveGame(silent) {
     if (!G.started) return false;
@@ -7465,6 +9061,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     const data = {
       version: 1, seed: G.seed, time: G.sky.time, savedAt: Date.now(),
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, health: P.health },
+      realm: G.realm, gatePos: G.gatePos, end: G.endState,
       inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize(), world: G.world.serialize()
     };
     const ok = store.set(SAVE_KEY, JSON.stringify(data));
@@ -7476,6 +9073,12 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   // ------------------------------------------------------------------ HUD
   function updateHUD() {
     const P = G.player;
+    const boss = G.mobs && G.realm === 'end' ? G.mobs.alive().find((m) => m.type.boss) : null;
+    $('boss-bar').classList.toggle('hidden', !boss);
+    if (boss) { $('boss-hp').style.width = Math.max(0, (100 * boss.health) / boss.maxHealth).toFixed(0) + '%'; G.endState.bossHealth = boss.health; }
+    const tm = G.mobs && G.mobs.target;
+    $('mob-bar').classList.toggle('hidden', !tm);
+    if (tm) { $('mob-name').textContent = tm.type.name; $('mob-hp').style.width = Math.max(0, (100 * tm.health) / tm.maxHealth).toFixed(0) + '%'; }
     const hearts = $('hearts').children;
     for (let i = 0; i < hearts.length; i++) {
       const v = P.health - i * 2;
@@ -7538,7 +9141,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
   let UNDERWATER_FOG = null, tmpColor = null; // created lazily: THREE may be missing at load time
   function applyFog() {
     if (!UNDERWATER_FOG) { UNDERWATER_FOG = new THREE.Color(0.06, 0.26, 0.32); tmpColor = new THREE.Color(); }
-    const far = Math.max(40, G.world.renderDistance * 16 - 6), near = far * 0.5;
+    let far = Math.max(40, G.world.renderDistance * 16 - 6), near = far * 0.5;
+    if (G.realm === 'ember') { far = Math.min(far, 84); near = 16; }
     const u = G.underwater;
     const fog = G.scene.fog;
     fog.near = near + (0.5 - near) * u;
@@ -7573,7 +9177,7 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
         if (k.has('ArrowUp')) P.look(0, -turn / 0.0022, 0.0022, false);
         if (k.has('ArrowDown')) P.look(0, turn / 0.0022, 0.0022, false);
       }
-      if (G.world.isAreaReady(P.pos.x, P.pos.z)) {
+      if (G.world.isAreaReady(P.pos.x, P.pos.z) && !G.travel) {
         G.acc += dt;
         const inp = st === 'playing' ? moveInput() : NO_INPUT;
         let n = 0;
@@ -7619,7 +9223,14 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
     if (live) G.wildlife.update(dt, G.centerVec, G.sky.daylight, G.fog.color, G.fog.near, G.fog.far);
     G.water.updateUniforms(G.time, G.sky, G.fog.near, G.fog.far, G.fog.color);
     G.interaction.setHandLight(G.sky.daylight, G.sky.sun.color);
-    if (simulate) { G.interaction.update(dt, G.input, st === 'playing'); OM.Furnaces.update(Math.min(dt, 0.25)); G.inventory.update(); }
+    if (simulate) {
+      G.interaction.update(dt, G.input, st === 'playing' && !G.travel);
+      OM.Furnaces.update(Math.min(dt, 0.25));
+      G.inventory.update();
+      if (G.started && !G.travel) G.mobs.update(Math.min(dt, 0.1), { daylight: G.sky.daylight, realm: G.realm });
+      updatePortals(dt);
+      if (G.endingTimer > 0 && (G.endingTimer -= dt) <= 0) { G.endingTimer = -1; if (document.pointerLockElement) document.exitPointerLock(); setState('ending'); }
+    }
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);

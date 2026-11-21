@@ -16,7 +16,8 @@
     'oak_log', 'oak_log_top', 'oak_leaves', 'birch_log', 'birch_log_top', 'birch_leaves',
     'spruce_log', 'spruce_log_top', 'spruce_leaves', 'planks', 'cobble', 'mossy_cobble',
     'glass', 'bricks', 'coal_ore', 'iron_ore', 'bedrock', 'snow', 'snow_side',
-    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian'
+    'stone_bricks', 'birch_planks', 'crafting_table_top', 'crafting_table_side', 'furnace_top', 'furnace_side', 'diamond_ore', 'lava', 'obsidian',
+    'ashstone', 'emberstone', 'cinderbrick', 'portal', 'gate_top', 'gate_side', 'gate_eye_top', 'void_gate', 'voidstone', 'ash_ore'
   ];
   const T = {};
   TILES.forEach((n, i) => { T[n] = i; });
@@ -29,7 +30,8 @@
     OAK_LOG: 7, OAK_LEAVES: 8, BIRCH_LOG: 9, BIRCH_LEAVES: 10, SPRUCE_LOG: 11, SPRUCE_LEAVES: 12,
     PLANKS: 13, COBBLE: 14, MOSSY_COBBLE: 15, GLASS: 16, BRICKS: 17, COAL_ORE: 18, IRON_ORE: 19,
     BEDROCK: 20, SNOW: 21, STONE_BRICKS: 22, BIRCH_PLANKS: 23,
-    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
+    CRAFTING_TABLE: 24, FURNACE: 25, DIAMOND_ORE: 26, LAVA: 27, OBSIDIAN: 28,
+    ASHSTONE: 29, EMBERSTONE: 30, CINDERBRICK: 31, PORTAL: 32, GATE_FRAME: 33, GATE_EYE: 34, VOID_GATE: 35, VOIDSTONE: 36, ASH_ORE: 37   // block ids below 64 are reserved for blocks (the multiplayer server accepts them all)
   };
 
   const defs = [];
@@ -72,6 +74,17 @@
   // Lava is a still, glowing liquid block: it blocks water like stone does, but the player sinks into it (liquid) and burns.
   def(B.LAVA, 'lava', 'Lava', { hardness: Infinity, tiles: [T.lava, T.lava, T.lava], drop: 0, liquid: true, glow: true, color: [236, 110, 30] });
   def(B.OBSIDIAN, 'obsidian', 'Obsidian', { hardness: 14, tiles: [T.obsidian, T.obsidian, T.obsidian], color: [34, 24, 54] });
+  // The fire realm's stone, its light block and its fortress bricks
+  def(B.ASHSTONE, 'ashstone', 'Ashstone', { hardness: 1.1, tiles: [T.ashstone, T.ashstone, T.ashstone], color: [96, 58, 54] });
+  def(B.EMBERSTONE, 'emberstone', 'Emberstone', { hardness: 0.7, tiles: [T.emberstone, T.emberstone, T.emberstone], glow: true, color: [255, 170, 60] });
+  def(B.CINDERBRICK, 'cinderbrick', 'Cinder Bricks', { hardness: 2.0, tiles: [T.cinderbrick, T.cinderbrick, T.cinderbrick], color: [96, 42, 42] });
+  // Portals: thin glowing membranes you can walk into (they only exist inside a lit frame, and cannot be carried)
+  def(B.PORTAL, 'portal', 'Portal', { solid: false, opaque: false, cutout: true, hardness: Infinity, tiles: [T.portal, T.portal, T.portal], drop: 0, glow: true, noItem: true, color: [150, 80, 220] });
+  def(B.GATE_FRAME, 'gate_frame', 'Gate Frame', { hardness: Infinity, tiles: [T.gate_top, T.gate_side, T.gate_side], drop: 0, noItem: true, color: [100, 112, 104] });
+  def(B.GATE_EYE, 'gate_eye', 'Sealed Gate Frame', { hardness: Infinity, tiles: [T.gate_eye_top, T.gate_side, T.gate_side], drop: 0, noItem: true, glow: true, color: [80, 200, 160] });
+  def(B.VOID_GATE, 'void_gate', 'Void Gate', { solid: false, opaque: false, cutout: true, hardness: Infinity, tiles: [T.void_gate, T.void_gate, T.void_gate], drop: 0, glow: true, noItem: true, color: [60, 20, 110] });
+  def(B.ASH_ORE, 'ash_ore', 'Ember Ore', { hardness: 3.2, tiles: [T.ash_ore, T.ash_ore, T.ash_ore], color: [190, 100, 60] });
+  def(B.VOIDSTONE, 'voidstone', 'Voidstone', { hardness: 1.6, tiles: [T.voidstone, T.voidstone, T.voidstone], color: [226, 222, 160] });
 
   // Fast lookup tables. Face order everywhere: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z
   const SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), CUTOUT = new Uint8Array(256);
@@ -160,7 +173,7 @@
   const I = { BUCKET: 200, WATER_BUCKET: 201 };
   const itemDefs = [];
   for (const d of defs) {
-    if (!d || d.id === B.AIR || d.liquid) continue;   // lava cannot be carried
+    if (!d || d.id === B.AIR || d.liquid || d.noItem) continue;   // lava, portals and gates cannot be carried
     itemDefs[d.id] = { id: d.id, name: d.name, kind: 'block', block: d.id, max: 64, icon: null };
   }
   for (const d of plantDefs) {

@@ -59,6 +59,9 @@
       this.edits = new Map();
       this.waterEdits = new Map();
       this.plantEdits = new Map();
+      this.realm = 'meadow';                  // which world is loaded: 'meadow', 'ember' or 'end'
+      this.realmData = { meadow: { edits: this.edits, waterEdits: this.waterEdits, plantEdits: this.plantEdits } };
+      this.minLight = 0.24;                   // the darkest a face may be shaded (caves are dark, the fire realm is not)
       this.renderDistance = opts.renderDistance || 6;
       this.plantDistance = opts.plantDistance || 4;
       this.fancyLeaves = true;
@@ -74,6 +77,18 @@
       this.tickTimer = 0;
       this.stats = { generated: 0, meshed: 0 };
       this.R2 = 0; this.P2 = 0;
+    }
+
+    /** Replaces the whole loaded world with another realm's terrain (each realm keeps its own player edits). */
+    switchRealm(realm, gen) {
+      for (const c of Array.from(this.chunks.values())) this.unload(c);
+      this.chunks.clear(); this.urgent.clear(); this.waterDirty.clear(); this.lastChunk = null;
+      this.realm = realm; this.gen = gen;
+      const d = this.realmData[realm] || (this.realmData[realm] = { edits: new Map(), waterEdits: new Map(), plantEdits: new Map() });
+      this.edits = d.edits; this.waterEdits = d.waterEdits; this.plantEdits = d.plantEdits;
+      this.minLight = gen.minLight || 0.24;
+      this.center = { cx: 1e9, cz: 1e9 }; this.wantedDirty = true;
+      if (this.water) this.water.pending.clear();
     }
 
     // ------------------------------------------------------------------ access
@@ -541,7 +556,13 @@
         for (const [k, mm] of m) if (mm.size) o[k] = Array.from(mm.entries()).flat();
         return o;
       };
-      return { blocks: ser(this.edits), water: ser(this.waterEdits), plants: ser(this.plantEdits) };
+      const m = this.realmData.meadow, out = { blocks: ser(m.edits), water: ser(m.waterEdits), plants: ser(m.plantEdits), realms: {} };
+      for (const k of Object.keys(this.realmData)) {
+        if (k === 'meadow') continue;
+        const r = this.realmData[k];
+        out.realms[k] = { blocks: ser(r.edits), water: ser(r.waterEdits), plants: ser(r.plantEdits) };
+      }
+      return out;
     }
     deserialize(d) {
       const de = (o, target) => {
@@ -552,7 +573,12 @@
           target.set(Number(k), m);
         }
       };
-      de(d.blocks, this.edits); de(d.water, this.waterEdits); de(d.plants, this.plantEdits);
+      const m = this.realmData.meadow;
+      de(d.blocks, m.edits); de(d.water, m.waterEdits); de(d.plants, m.plantEdits);
+      if (d.realms) for (const k of Object.keys(d.realms)) {
+        const r = this.realmData[k] || (this.realmData[k] = { edits: new Map(), waterEdits: new Map(), plantEdits: new Map() });
+        de(d.realms[k].blocks, r.edits); de(d.realms[k].water, r.waterEdits); de(d.realms[k].plants, r.plantEdits);
+      }
     }
   }
 

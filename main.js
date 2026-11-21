@@ -236,6 +236,9 @@
       seed, scene: G.scene, textures: G.textures, materials: G.materials,
       renderDistance: G.settings.renderDistance, plantDistance: plantDistanceFor(G.settings)
     });
+    G.gens = { meadow: G.world.gen, ember: new OM.Realms.EmberGen(seed ^ 0x5eed), end: new OM.Realms.EndGen(seed ^ 0xe11d) };
+    G.realm = 'meadow'; G.travel = null; G.portalT = 0; G.portalCool = 0; G.fade = 0; G.gatePos = null;
+    G.endState = { bossDead: false, bossHealth: null }; G.endingTimer = -1;
     G.water = new OM.Water(G.world);
     G.world.water = G.water;
     G.materials.water = G.water.createMaterial(G.textures);
@@ -261,6 +264,9 @@
       if (block === OM.B.CRAFTING_TABLE) openInventory('table');
       else if (block === OM.B.FURNACE) openInventory('furnace', OM.Furnaces.at(x, y, z));
     };
+    G.mobs = new OM.Mobs(G.world, G.scene, { player: G.player, audio: G.audio, toast, give: (id, n) => G.interaction.give(id, n) });
+    G.mobs.onBossDeath = () => { G.endState.bossDead = true; G.endState.bossHealth = null; G.endingTimer = 2.8; OM.Realms.openExit(G.world, null); };
+    G.interaction.mobs = G.mobs;
     hookPlayer();
 
     OM.Furnaces.clear();
@@ -272,6 +278,9 @@
     } else if (save) {
       try { G.world.deserialize(save.world || {}); } catch (e) { console.warn('[OpenMeadow] world edits could not be restored', e); }
       if (!G.inventory.deserialize(save.inventory)) G.inventory.starterKit();
+      if (save.realm && G.gens[save.realm] && save.realm !== 'meadow') setRealm(save.realm);
+      G.gatePos = save.gatePos || null;
+      if (save.end) G.endState = { bossDead: !!save.end.bossDead, bossHealth: save.end.bossHealth || null };
       OM.Furnaces.deserialize(save.furnaces);
     } else G.inventory.starterKit();
 
@@ -303,7 +312,7 @@
     P.onDeath = (cause) => {
       const msg = {
         fall: 'You fell from a great height.', drown: 'You ran out of air.', void: 'You fell out of the world.',
-        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.'
+        lava: 'You tried to swim in lava.', fire: 'You burned to a crisp.', mob: 'A creature got you.', blast: 'You were blown up.'
       }[cause] || 'You blacked out.';
       $('death-reason').textContent = msg;
       if (cause === 'void') { respawn(); toast('You fell out of the world — back to the meadow.'); return; }
@@ -335,6 +344,15 @@
   function respawn() {
     G.player.resetVitals();
     G.interaction.resetMining();
+    G.mobs.clear();
+    G.travel = null; G.portalT = 0;
+    if (G.realm === 'end') {                                  // a fall or a bite in the Void Isle only costs the walk back: you wake on the arrival platform
+      const spot = OM.Realms.arriveEnd(G.world, null);
+      G.player.spawnAt(spot.x, spot.y, spot.z); G.player.yaw = spot.yaw; G.player.pitch = -0.1;
+      G.mobs.clear(); spawnBoss();
+      return;
+    }
+    if (G.realm !== 'meadow') setRealm('meadow');
     placePlayer(spawnPoint());
     G.player.yaw = Math.random() * Math.PI * 2;
     G.player.pitch = -0.1;
@@ -346,8 +364,10 @@
     show('loading-screen', s === 'loading');
     show('menu-screen', s === 'menu');
     show('pause-screen', s === 'paused');
+    if (s === 'paused') show('pause-backup-row', !G.mp);
     show('death-screen', s === 'dead');
     show('hud', s === 'playing' || s === 'inventory' || s === 'chat');
+    show('ending-screen', s === 'ending');
     if (s !== 'menu' && s !== 'paused') { show('settings-screen', false); show('controls-screen', false); show('mp-screen', false); }
     document.body.classList.toggle('in-game', s === 'playing');
     if (s !== 'playing') { clearInput(); setLockHint(false); }
@@ -357,6 +377,7 @@
     if (s === 'menu') {
       $('btn-start').textContent = G.started || G.save ? 'Continue' : 'Start Game';
       show('btn-new', !G.mp);
+      show('menu-backup-row', !G.mp);
       show('btn-leave-mp', !!G.mp);
     }
     if (s === 'paused' && G.started) saveGame(true);
@@ -552,7 +573,11 @@
     bindClick('btn-settings-back', () => closeSub('settings-screen'));
     bindClick('btn-controls-back', () => closeSub('controls-screen'));
     bindClick('btn-respawn', () => { respawn(); resume(); });
+    bindClick('btn-export', exportWorld); bindClick('btn-menu-export', exportWorld);
+    bindClick('btn-import', () => $('import-file').click()); bindClick('btn-menu-import', () => $('import-file').click());
+    $('import-file').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; importWorld(f); });
     bindClick('inv-close', () => closeInventory(false));
+    bindClick('btn-ending-continue', resume);
     bindClick('lock-hint-btn', () => { G.lockFailures = 0; requestLock(); });
     bindClick('btn-multiplayer', () => {
       openSub('mp-screen', 'menu-screen');
@@ -674,6 +699,7 @@
     G.world.loadRemoteEdits(welcome.edits);
     G.remote = new OM.RemotePlayers(G.scene);
     G.interaction.net = net;
+    G.mobs.net = net;     // explosions spare the blocks in shared worlds
     G.interaction.remote = G.remote;
     for (const p of welcome.players) G.remote.add(p);
     net.onJoin = (p) => { G.remote.add(p); refreshPlayers(); };
@@ -743,6 +769,116 @@
     try { const d = JSON.parse(store.get(mpSaveKey()) || 'null'); return d && d.version === 1 ? d : null; } catch (e) { return null; }
   }
 
+  // ---------------------------------------------------------------- realms
+  /** Swaps the loaded world, sky, creatures and furnace keys over to another realm. */
+  function setRealm(to) {
+    G.realm = to;
+    OM.Furnaces.realm = to;
+    G.world.switchRealm(to, G.gens[to]);
+    G.sky.setRealm(to);
+    G.mobs.clear();
+    G.mobs.realm = to; G.mobs.realmGen = G.gens[to];
+    G.interaction.resetMining();
+    applyFog();
+  }
+  /** kind: 'portal' (meadow <-> the Ashlands, 8 blocks there are 1 here) or 'gate' (a vault gate <-> the Void Isle). */
+  function startTravel(kind) {
+    const P = G.player;
+    if (G.mp) { toast('Portals only work in single-player worlds for now'); G.portalCool = 6; return; }
+    let to, tx, tz;
+    if (kind === 'portal') {
+      to = G.realm === 'meadow' ? 'ember' : 'meadow';
+      tx = to === 'ember' ? P.pos.x / 8 : P.pos.x * 8; tz = to === 'ember' ? P.pos.z / 8 : P.pos.z * 8;
+    } else if (G.realm === 'end') {
+      to = 'meadow'; const g = G.gatePos || { x: G.spawn.x, y: G.spawn.y, z: G.spawn.z }; tx = g.x; tz = g.z;
+    } else { to = 'end'; G.gatePos = { x: P.pos.x, y: P.pos.y, z: P.pos.z }; tx = 0.5; tz = -30.5; }
+    setRealm(to);
+    G.travel = { to, kind, tx, tz, t: 0 };
+    P.vel.set(0, 0, 0); P.burning = 0;
+    P.spawnAt(tx, to === 'end' ? 80 : 70, tz);
+    $('portal-text').textContent = to === 'ember' ? 'Crossing into the Ashlands…' : to === 'end' ? 'Falling toward the Void Isle…' : 'Returning to the meadow…';
+  }
+  function finishTravel() {
+    const T = G.travel, W = G.world, P = G.player;
+    let spot;
+    if (T.to === 'end') spot = OM.Realms.arriveEnd(W, null);
+    else if (T.kind === 'gate') spot = G.gatePos ? { x: G.gatePos.x, y: G.gatePos.y, z: G.gatePos.z + 3, yaw: 0 } : (() => { const s = spawnPoint(); return { x: s.x, y: s.y, z: s.z, yaw: 0 }; })();   // beside the gate, not inside it
+    else spot = OM.Realms.arrive(W, T.to, T.tx, T.tz, null);
+    P.spawnAt(spot.x, spot.y, spot.z);
+    if (T.kind === 'gate' && T.to === 'meadow') placePlayer({ x: spot.x, y: spot.y, z: spot.z, exact: true });
+    P.yaw = spot.yaw; P.pitch = -0.05; P.vel.set(0, 0, 0);
+    G.travel = null; G.portalT = 0; G.portalCool = 3.5; G.fade = 1;
+    if (T.to === 'end') spawnBoss();
+    toast(T.to === 'ember' ? 'The Ashlands — lava below, fire above' : T.to === 'end' ? 'The Void Isle' : 'Home again', 2200);
+    saveGame(true);
+  }
+  function spawnBoss() {
+    if (G.endState.bossDead || G.mobs.alive().some((m) => m.type.boss)) return;
+    const m = G.mobs.spawn('starwyrm', 0, OM.Realms.ISLE_TOP + 16, 0);
+    m.cx = 0; m.cz = 0; m.cy = OM.Realms.ISLE_TOP;
+    if (G.endState.bossHealth) m.health = Math.max(1, Math.min(m.maxHealth, G.endState.bossHealth));
+  }
+  function updatePortals(dt) {
+    const P = G.player, po = $('portal-overlay');
+    if (G.travel) {
+      G.travel.t += dt;
+      let ready = true;
+      for (let dz = -2; dz <= 2 && ready; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const c = G.world.getChunk((Math.floor(G.travel.tx) >> 4) + dx, (Math.floor(G.travel.tz) >> 4) + dz);
+        if (!c || !c.generated) { ready = false; break; }
+      }
+      if (ready || G.travel.t > 25) finishTravel();
+    } else if (P.inPortal && !P.dead) {
+      if (G.portalCool <= 0) { G.portalT += dt; if (G.portalT >= 2.2) { G.portalT = 0; startTravel(P.inPortal); } }
+    } else G.portalT = Math.max(0, G.portalT - dt * 3);
+    G.portalCool = Math.max(0, G.portalCool - dt);
+    let a = 0;
+    if (G.travel) a = 1;
+    else if (G.fade > 0) { G.fade = Math.max(0, G.fade - dt * 0.8); a = G.fade; }
+    else if (P.inPortal && G.portalCool <= 0) a = Math.min(0.85, G.portalT / 2.2);
+    po.style.opacity = a.toFixed(2);
+    $('portal-text').style.opacity = G.travel ? '1' : '0';
+  }
+
+  // ---------------------------------------------------------------- backups
+  /** The whole single-player save (world edits in every realm, inventory, furnaces, progress) as a text file. */
+  function exportText() {
+    if (G.started && !G.mp) saveGame(true);
+    return store.get(SAVE_KEY);
+  }
+  function exportWorld() {
+    if (G.mp) { toast('In a multiplayer room the world lives on the server — there is nothing to export here'); return; }
+    const text = exportText();
+    if (!text) { toast('Play for a moment first, so there is something to back up'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'open-meadow-world-' + (G.seed || 'save') + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('World exported (' + Math.max(1, Math.round(text.length / 1024)) + ' KB) — keep the file somewhere safe', 3200);
+  }
+  /** Validates a backup and makes it the saved world; the page then reloads into it. Returns an error text or '' on success. */
+  function importText(text) {
+    let d;
+    try { d = JSON.parse(text); } catch (e) { return 'That file is not a world backup (it is not valid JSON).'; }
+    if (!d || d.version !== 1 || !Number.isFinite(d.seed) || !d.inventory || !Array.isArray(d.inventory.slots) || !d.world || typeof d.world !== 'object') return 'That file is not an Open Meadow world backup.';
+    if (!store.set(SAVE_KEY, JSON.stringify(d))) return 'Your browser has no room to store that world.';
+    G.started = false;                                    // so the unload handler does not overwrite it with the old world
+    window.location.reload();
+    return '';
+  }
+  function importWorld(file) {
+    if (G.mp) { toast('Leave the multiplayer room first — imports replace your single-player world'); return; }
+    if (!file) return;
+    if (file.size > 30 * 1024 * 1024) { toast('That file is too large to be a world backup'); return; }
+    if (!window.confirm('Replace your current world with "' + file.name + '"? The world you have now will be overwritten.')) return;
+    const r = new FileReader();
+    r.onload = () => { const err = importText(String(r.result)); if (err) toast(err, 3600); };
+    r.onerror = () => toast('The file could not be read');
+    r.readAsText(file);
+  }
+  G.exportText = exportText; G.importText = importText;
+
   // ---------------------------------------------------------------- saving
   function saveGame(silent) {
     if (!G.started) return false;
@@ -755,6 +891,7 @@
     const data = {
       version: 1, seed: G.seed, time: G.sky.time, savedAt: Date.now(),
       player: { x: P.pos.x, y: P.pos.y, z: P.pos.z, yaw: P.yaw, pitch: P.pitch, health: P.health },
+      realm: G.realm, gatePos: G.gatePos, end: G.endState,
       inventory: G.inventory.serialize(), furnaces: OM.Furnaces.serialize(), world: G.world.serialize()
     };
     const ok = store.set(SAVE_KEY, JSON.stringify(data));
@@ -766,6 +903,12 @@
   // ------------------------------------------------------------------ HUD
   function updateHUD() {
     const P = G.player;
+    const boss = G.mobs && G.realm === 'end' ? G.mobs.alive().find((m) => m.type.boss) : null;
+    $('boss-bar').classList.toggle('hidden', !boss);
+    if (boss) { $('boss-hp').style.width = Math.max(0, (100 * boss.health) / boss.maxHealth).toFixed(0) + '%'; G.endState.bossHealth = boss.health; }
+    const tm = G.mobs && G.mobs.target;
+    $('mob-bar').classList.toggle('hidden', !tm);
+    if (tm) { $('mob-name').textContent = tm.type.name; $('mob-hp').style.width = Math.max(0, (100 * tm.health) / tm.maxHealth).toFixed(0) + '%'; }
     const hearts = $('hearts').children;
     for (let i = 0; i < hearts.length; i++) {
       const v = P.health - i * 2;
@@ -828,7 +971,8 @@
   let UNDERWATER_FOG = null, tmpColor = null; // created lazily: THREE may be missing at load time
   function applyFog() {
     if (!UNDERWATER_FOG) { UNDERWATER_FOG = new THREE.Color(0.06, 0.26, 0.32); tmpColor = new THREE.Color(); }
-    const far = Math.max(40, G.world.renderDistance * 16 - 6), near = far * 0.5;
+    let far = Math.max(40, G.world.renderDistance * 16 - 6), near = far * 0.5;
+    if (G.realm === 'ember') { far = Math.min(far, 84); near = 16; }
     const u = G.underwater;
     const fog = G.scene.fog;
     fog.near = near + (0.5 - near) * u;
@@ -863,7 +1007,7 @@
         if (k.has('ArrowUp')) P.look(0, -turn / 0.0022, 0.0022, false);
         if (k.has('ArrowDown')) P.look(0, turn / 0.0022, 0.0022, false);
       }
-      if (G.world.isAreaReady(P.pos.x, P.pos.z)) {
+      if (G.world.isAreaReady(P.pos.x, P.pos.z) && !G.travel) {
         G.acc += dt;
         const inp = st === 'playing' ? moveInput() : NO_INPUT;
         let n = 0;
@@ -909,7 +1053,14 @@
     if (live) G.wildlife.update(dt, G.centerVec, G.sky.daylight, G.fog.color, G.fog.near, G.fog.far);
     G.water.updateUniforms(G.time, G.sky, G.fog.near, G.fog.far, G.fog.color);
     G.interaction.setHandLight(G.sky.daylight, G.sky.sun.color);
-    if (simulate) { G.interaction.update(dt, G.input, st === 'playing'); OM.Furnaces.update(Math.min(dt, 0.25)); G.inventory.update(); }
+    if (simulate) {
+      G.interaction.update(dt, G.input, st === 'playing' && !G.travel);
+      OM.Furnaces.update(Math.min(dt, 0.25));
+      G.inventory.update();
+      if (G.started && !G.travel) G.mobs.update(Math.min(dt, 0.1), { daylight: G.sky.daylight, realm: G.realm });
+      updatePortals(dt);
+      if (G.endingTimer > 0 && (G.endingTimer -= dt) <= 0) { G.endingTimer = -1; if (document.pointerLockElement) document.exitPointerLock(); setState('ending'); }
+    }
     G.audio.update(dt, { daylight: G.sky.daylight, underwater: G.underwater, beeDist: nearestBeeDistance(), paused: !live });
 
     $('underwater-overlay').style.opacity = (G.underwater * 0.85).toFixed(3);

@@ -27,6 +27,7 @@
       this.zenith = new THREE.Color(); this.horizon = new THREE.Color();
       this.fogColor = new THREE.Color(); this.sunColor = new THREE.Color();
       this.daylight = 1; this.golden = 0;
+      this.realm = 'meadow';
       this.cloudOffset = new THREE.Vector2(Math.random() * 100, Math.random() * 100);
 
       this.material = new THREE.ShaderMaterial({
@@ -66,13 +67,36 @@
     setShadowQuality(q) {
       this.shadowQuality = q;
       const res = q === 'high' ? 2048 : 1024, ext = q === 'high' ? 72 : 46;
-      this.sun.castShadow = q !== 'off';
+      this.sun.castShadow = q !== 'off' && this.realm === 'meadow';
       this.shadowRes = res; this.shadowExtent = ext;
       const s = this.sun.shadow;
       s.mapSize.set(res, res);
       s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext;
       s.camera.updateProjectionMatrix();
       if (s.map) { s.map.dispose(); s.map = null; }
+    }
+
+    /** 'meadow' follows the day cycle; 'ember' and 'end' have fixed skies with no sun, moon or clouds. */
+    setRealm(name) {
+      this.realm = name || 'meadow';
+      this.sun.castShadow = this.realm === 'meadow' && this.shadowQuality !== 'off';
+      if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    }
+    realmLook(dt, cam) {
+      const R = REALM_LOOK[this.realm];
+      this.daylight = R.daylight; this.golden = 0;
+      this.zenith.setRGB(R.zenith[0], R.zenith[1], R.zenith[2]); this.horizon.setRGB(R.horizon[0], R.horizon[1], R.horizon[2]);
+      this.fogColor.setRGB(R.fog[0], R.fog[1], R.fog[2]); this.sunColor.setRGB(R.light[0], R.light[1], R.light[2]);
+      this.sunDir.set(0.2, -1, 0.1).normalize(); this.moonDir.copy(this.sunDir);
+      this.lightDir.set(0.35, 1, 0.25).normalize();
+      this.sun.color.copy(this.sunColor); this.sun.intensity = R.sun;
+      this.hemi.color.setRGB(R.hemi[0], R.hemi[1], R.hemi[2]); this.hemi.groundColor.setRGB(R.ground[0], R.ground[1], R.ground[2]); this.hemi.intensity = R.hemiI;
+      this.positionShadow(cam, this.lightDir);
+      this.dome.position.copy(cam);
+      const u = this.material.uniforms;
+      u.uZenith.value.copy(this.zenith); u.uHorizon.value.copy(this.horizon); u.uFogColor.value.copy(this.fogColor); u.uSunColor.value.copy(this.sunColor);
+      u.uSunDir.value.copy(this.sunDir); u.uMoonDir.value.copy(this.moonDir);
+      u.uTime.value += dt; u.uStars.value = R.stars; u.uDay.value = 0.3; u.uGolden.value = 0; u.uUnderwater.value = 0; u.uCloudCover.value = 3;
     }
 
     timeString() {
@@ -82,6 +106,7 @@
 
     update(dt, cam, underwater) {
       if (this.cycle) this.time = (this.time + dt / this.dayLength) % 1;
+      if (this.realm !== 'meadow') { this.realmLook(dt, cam); return; }
       const ang = (this.time - 0.25) * Math.PI * 2;
       this.sunDir.set(Math.cos(ang), Math.sin(ang), 0.32).normalize();
       this.moonDir.copy(this.sunDir).negate();
@@ -138,6 +163,11 @@
       this.sun.updateMatrixWorld();
     }
   }
+
+  const REALM_LOOK = {
+    ember: { zenith: [0.22, 0.05, 0.03], horizon: [0.5, 0.13, 0.05], fog: [0.32, 0.08, 0.04], light: [1.0, 0.58, 0.32], sun: 0.55, hemi: [1.0, 0.56, 0.36], ground: [0.5, 0.18, 0.08], hemiI: 0.9, stars: 0, daylight: 0.5 },
+    end: { zenith: [0.02, 0.0, 0.07], horizon: [0.1, 0.03, 0.18], fog: [0.05, 0.02, 0.1], light: [0.72, 0.62, 1.0], sun: 0.5, hemi: [0.6, 0.52, 0.98], ground: [0.22, 0.16, 0.36], hemiI: 0.75, stars: 1, daylight: 0.45 }
+  };
 
   const SKY_VS = /* glsl */`
     varying vec3 vDir;

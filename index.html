@@ -14,6 +14,7 @@
   <!-- 3D view -->
   <div id="canvas-host"></div>
   <div id="underwater-overlay"></div>
+  <div id="portal-overlay"><span id="portal-text"></span></div>
   <div id="lava-overlay"></div>
   <div id="fire-overlay"></div>
   <div id="damage-overlay"></div>
@@ -30,6 +31,8 @@
       <b>Left click</b> mine · <b>Right click</b> place / use · <b>1–9 / wheel</b> hotbar · <b>E</b> inventory &amp; crafting · <b>Esc</b> pause
     </div>
     <div id="item-name"></div>
+    <div id="boss-bar" class="hidden"><span>The Starwyrm</span><div class="boss-track"><i id="boss-hp"></i></div></div>
+    <div id="mob-bar" class="hidden"><span id="mob-name"></span><div class="mob-track"><i id="mob-hp"></i></div></div>
     <div id="status">
       <div id="hearts"><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i><i class="heart full"></i></div>
       <div id="bubbles" class="hidden"><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i><i class="bubble"></i></div>
@@ -91,6 +94,16 @@
     <div id="cursor-stack" class="slot cursor"><img class="slot-icon" alt="" draggable="false"><span class="slot-count"></span></div>
   </div>
 
+  <!-- The ending -->
+  <div id="ending-screen" class="screen hidden">
+    <div class="panel ending-panel">
+      <h1 class="logo">The <span>Starwyrm</span> is gone</h1>
+      <p class="tagline">You crossed the lava lakes, lit the obsidian door and walked through the Ashlands. You sealed the Void Gate with seeker eyes and brought down the dragon of the Void Isle.</p>
+      <p class="muted">The meadow is quiet again. A gate home has opened in the middle of the isle — and the world goes on forever in every direction, so build, explore, or go looking for more.</p>
+      <div class="menu-buttons"><button id="btn-ending-continue" class="btn primary" type="button">Keep exploring</button></div>
+    </div>
+  </div>
+
   <!-- Loading -->
   <div id="loading-screen" class="screen">
     <div class="loading-card">
@@ -111,6 +124,10 @@
         <button id="btn-new" class="btn" type="button">New World</button>
         <button id="btn-multiplayer" class="btn" type="button">Multiplayer</button>
         <button id="btn-leave-mp" class="btn hidden" type="button">Leave Multiplayer</button>
+        <div class="btn-row" id="menu-backup-row">
+          <button id="btn-menu-export" class="btn" type="button" title="Download your world as a backup file">Export World</button>
+          <button id="btn-menu-import" class="btn" type="button" title="Replace your world with a backup file">Import World</button>
+        </div>
         <div class="btn-row">
           <button id="btn-settings" class="btn" type="button">Settings</button>
           <button id="btn-controls" class="btn" type="button">Controls</button>
@@ -131,11 +148,17 @@
           <button id="btn-pause-controls" class="btn" type="button">Controls</button>
         </div>
         <button id="btn-save" class="btn" type="button">Save World</button>
+        <div class="btn-row" id="pause-backup-row">
+          <button id="btn-export" class="btn" type="button" title="Download your world as a backup file">Export World</button>
+          <button id="btn-import" class="btn" type="button" title="Replace your world with a backup file">Import World</button>
+        </div>
         <button id="btn-quit" class="btn" type="button">Save &amp; Quit to Title</button>
       </div>
       <p class="muted">Your world also saves automatically every minute.</p>
     </div>
   </div>
+
+  <input id="import-file" type="file" accept=".json,application/json" class="hidden">
 
   <!-- Death -->
   <div id="death-screen" class="screen hidden">
@@ -273,6 +296,7 @@
   <script src="engine/crafting.js"></script>
   <script src="engine/textures.js"></script>
   <script src="engine/terrain.js"></script>
+  <script src="engine/realms.js"></script>
   <script src="engine/mesher.js"></script>
   <script src="engine/world.js"></script>
   <script src="engine/water.js"></script>
@@ -280,6 +304,7 @@
   <script src="engine/nature.js"></script>
   <script src="engine/wildlife.js"></script>
   <script src="engine/player.js"></script>
+  <script src="engine/mobs.js"></script>
   <script src="engine/interaction.js"></script>
   <script src="engine/audio.js"></script>
   <script src="engine/net.js"></script>

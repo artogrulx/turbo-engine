@@ -14,6 +14,8 @@
   const WATER_SOURCE = 16 | 8;
   const FORCE = 256; // stamp flag: may replace terrain (used by boulders)
   const TREE_CELL = 5, BUSH_CELL = 7, ROCK_CELL = 11, SPRING_CELL = 48;
+  const VILLAGE_CELL = 176, VILLAGE_CHANCE = 0.55;   // a village candidate per 176x176 blocks
+  const VAULT_CELL = 512;                    // one sealed vault (the way to the Void Isle) per 512x512 blocks
   const LAVA_CELL = 52, LAVA_CHANCE = 0.4;   // one candidate lava lake per 52x52 blocks, 40% of which are kept
   const isLeaves = (id) => id === B.OAK_LEAVES || id === B.BIRCH_LEAVES || id === B.SPRUCE_LEAVES;
 
@@ -124,6 +126,8 @@
       this.col = { h: 0, river: 0, forest: 0, hill: 0 };
       this.cache = new Map();
       this.lavaCache = new Map();
+      this.vaultCache = new Map();
+      this.villageCache = new Map();
       this.hm = new Int16Array(18 * 18);
       this.riv = new Float32Array(18 * 18);
       this.fr = new Float32Array(18 * 18);
@@ -250,6 +254,131 @@
       this.lavaCache.set(key, res);
       return res;
     }
+    /** A village: a lantern plaza ringed by 4-7 plank-and-log houses with glass windows, gravel paths and the odd crafting table or
+     *  furnace indoors. Only on flat, dry land (the whole site is levelled to the plaza). Returns null when the cell has none. */
+    village(gx, gz) {
+      const key = (gx + 5000) * 10007 + gz + 5000;
+      if (this.villageCache.has(key)) return this.villageCache.get(key);
+      if (this.villageCache.size > 400) this.villageCache.clear();
+      const s = this.seed;
+      let res = null;
+      if (N.hash2(gx, gz, s + 951) < VILLAGE_CHANCE) {
+        const cx = gx * VILLAGE_CELL + 40 + Math.floor(N.hash2(gx, gz, s + 952) * (VILLAGE_CELL - 80));
+        const cz = gz * VILLAGE_CELL + 40 + Math.floor(N.hash2(gx, gz, s + 953) * (VILLAGE_CELL - 80));
+        const c = this.sample(cx, cz), h = Math.floor(c.h);
+        let ok = h > SEA + 3 && h < 80 && c.river < 0.2 && Math.hypot(cx, cz) > 50;
+        for (let a = 0; ok && a < 16; a++) {
+          const ang = (a * Math.PI) / 8, rad = a % 2 ? 24 : 15, q = this.sample(cx + Math.cos(ang) * rad, cz + Math.sin(ang) * rad);
+          if (Math.abs(Math.floor(q.h) - h) > 3 || q.river > 0.25 || q.h <= SEA + 2) ok = false;
+        }
+        if (ok && this.lavaNear(cx, cz, 34)) ok = false;
+        if (ok) {
+          const out = [], put = (x, y, z, id) => out.push(x, y, z, id | FORCE);
+          const rng = N.mulberry32(N.hashInt(gx, 17, gz, s + 954));
+          // plaza with a lantern post
+          for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+            if (dx * dx + dz * dz > 18) continue;
+            for (let y = h + 1; y <= h + 8; y++) put(cx + dx, y, cz + dz, 0);
+            put(cx + dx, h, cz + dz, (dx + dz) % 2 === 0 ? B.COBBLE : B.GRAVEL);
+          }
+          for (let y = h + 1; y <= h + 3; y++) put(cx, y, cz, B.COBBLE);
+          put(cx, h + 4, cz, B.EMBERSTONE);
+          const n = 4 + Math.floor(rng() * 4), houses = [];
+          for (let i = 0; i < n; i++) {
+            const ang = (i / n) * Math.PI * 2 + rng() * 0.5, rad = 13 + rng() * 6;
+            const w = 5 + 2 * Math.floor(rng() * 2), d = 5 + 2 * Math.floor(rng() * 2);
+            const hx = Math.round(cx + Math.cos(ang) * rad), hz = Math.round(cz + Math.sin(ang) * rad), hw = (w - 1) / 2, hd = (d - 1) / 2;
+            if (houses.some((o) => Math.abs(o.x - hx) < 10 && Math.abs(o.z - hz) < 10)) continue;
+            houses.push({ x: hx, z: hz });
+            const toX = Math.abs(cx - hx) > Math.abs(cz - hz), sx = Math.sign(cx - hx) || 1, sz = Math.sign(cz - hz) || 1;
+            const door = toX ? [hx + sx * hw, hz] : [hx, hz + sz * hd];
+            for (let dz = -hd - 1; dz <= hd + 1; dz++) for (let dx = -hw - 1; dx <= hw + 1; dx++) {        // level the site and clear the air above it
+              const x = hx + dx, z = hz + dz, g = Math.floor(this.sample(x, z).h);
+              for (let y = Math.min(g, h) - 1; y < h; y++) put(x, y, z, B.COBBLE);
+              for (let y = h + 1; y <= Math.max(g, h) + 9; y++) put(x, y, z, 0);
+            }
+            for (let dz = -hd; dz <= hd; dz++) for (let dx = -hw; dx <= hw; dx++) {
+              const x = hx + dx, z = hz + dz, edge = Math.abs(dx) === hw || Math.abs(dz) === hd, corner = Math.abs(dx) === hw && Math.abs(dz) === hd;
+              put(x, h, z, B.PLANKS);
+              for (let y = h + 1; y <= h + 3; y++) {
+                if (!edge) continue;
+                if (corner) put(x, y, z, B.OAK_LOG);
+                else if (x === door[0] && z === door[1] && y <= h + 2) continue;                         // the doorway stays open
+                else if (y === h + 2 && ((Math.abs(dx) === 0 && Math.abs(dz) === hd) || (Math.abs(dz) === 0 && Math.abs(dx) === hw))) put(x, y, z, B.GLASS);
+                else put(x, y, z, B.PLANKS);
+              }
+            }
+            for (let k = 0; k < 3; k++) {                                                                // stepped roof
+              const rw = hw + 1 - k, rd = hd + 1 - k;
+              if (rw < 0 || rd < 0) break;
+              for (let dz = -rd; dz <= rd; dz++) for (let dx = -rw; dx <= rw; dx++) put(hx + dx, h + 4 + k, hz + dz, k === 0 && (Math.abs(dx) === rw || Math.abs(dz) === rd) ? B.OAK_LOG : B.PLANKS);
+            }
+            if (rng() < 0.55) put(hx - hw + 1, h + 1, hz - hd + 1, B.CRAFTING_TABLE);
+            if (rng() < 0.4) put(hx + hw - 1, h + 1, hz - hd + 1, B.FURNACE);
+            // a gravel path from the doorway to the plaza
+            let px = door[0], pz = door[1];
+            for (let step = 0; step < 24 && Math.hypot(px - cx, pz - cz) > 4.5; step++) {
+              if (Math.abs(cx - px) > Math.abs(cz - pz)) px += Math.sign(cx - px); else pz += Math.sign(cz - pz);
+              const g = Math.floor(this.sample(px, pz).h);
+              if (Math.abs(g - h) <= 1) put(px, g, pz, B.GRAVEL);
+            }
+          }
+          res = { x: cx, z: cz, h, r: 28, blocks: out, houses };
+        }
+      }
+      this.villageCache.set(key, res);
+      return res;
+    }
+    villageNear(x, z, range) {
+      for (let gz = Math.floor((z - range - 30) / VILLAGE_CELL); gz <= Math.floor((z + range + 30) / VILLAGE_CELL); gz++)
+        for (let gx = Math.floor((x - range - 30) / VILLAGE_CELL); gx <= Math.floor((x + range + 30) / VILLAGE_CELL); gx++) {
+          const v = this.village(gx, gz);
+          if (v && Math.hypot(v.x - x, v.z - z) < range + v.r) return v;
+        }
+      return null;
+    }
+
+    /** The vault of a VAULT_CELL square: a buried brick room with a ring of eight gate frames (some already sealed) around a bare floor. */
+    vault(gx, gz) {
+      const key = (gx + 5000) * 10007 + gz + 5000;
+      const known = this.vaultCache.get(key);
+      if (known) return known;
+      const s = this.seed;
+      let x = gx * VAULT_CELL + 70 + Math.floor(N.hash2(gx, gz, s + 901) * (VAULT_CELL - 140));
+      const z = gz * VAULT_CELL + 70 + Math.floor(N.hash2(gx, gz, s + 902) * (VAULT_CELL - 140));
+      if (Math.hypot(x, z) < 220) x += 300;               // never right beside the spawn
+      const out = [], fy = 12;
+      const put = (px, py, pz, id) => out.push(px, py, pz, id | FORCE);
+      const brick = (px, py, pz) => put(px, py, pz, N.hash3(px, py, pz, s + 905) < 0.22 ? B.MOSSY_COBBLE : B.STONE_BRICKS);
+      for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) {
+        const px = x + dx, pz = z + dz, edge = Math.abs(dx) === 8 || Math.abs(dz) === 8;
+        brick(px, fy, pz); brick(px, fy + 8, pz);
+        for (let y = fy + 1; y < fy + 8; y++) { if (edge) brick(px, y, pz); else put(px, y, pz, 0); }
+      }
+      for (const [dx, dz] of [[-7, -7], [7, -7], [-7, 7], [7, 7], [-4, -4], [4, -4], [-4, 4], [4, 4], [0, -7], [0, 7], [-7, 0], [7, 0]]) put(x + dx, fy + 7, z + dz, B.EMBERSTONE);   // lamps
+      let sealed = 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dz) continue;
+        const eye = N.hash3(gx, gz, (dx + 1) * 3 + dz + 1, s + 903) < 0.25;
+        if (eye) sealed++;
+        put(x + dx, fy + 1, z + dz, eye ? B.GATE_EYE : B.GATE_FRAME);
+      }
+      if (sealed === 8) put(x, fy + 1, z, B.VOID_GATE);
+      for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) for (let y = fy + 1; y < fy + 7; y++) brick(x + dx, y, z + dz);    // pillars
+      const v = { x, z, y: fy + 1, blocks: out };
+      this.vaultCache.set(key, v);
+      return v;
+    }
+    /** The vault closest to (x, z) (the seeker eye follows this). */
+    nearestVault(x, z) {
+      let best = null, bd = 1e18;
+      const gx0 = Math.floor(x / VAULT_CELL), gz0 = Math.floor(z / VAULT_CELL);
+      for (let gz = gz0 - 2; gz <= gz0 + 2; gz++) for (let gx = gx0 - 2; gx <= gx0 + 2; gx++) {
+        const v = this.vault(gx, gz), d = (v.x - x) * (v.x - x) + (v.z - z) * (v.z - z);
+        if (d < bd) { bd = d; best = v; }
+      }
+      return best;
+    }
     /** The nearest lava lake within `range` blocks of (x, z), or null (used to keep the spawn point safe). */
     lavaNear(x, z, range) {
       for (let gz = Math.floor((z - range) / LAVA_CELL); gz <= Math.floor((z + range) / LAVA_CELL); gz++)
@@ -324,6 +453,20 @@
           const st = this.structure(kind, gx, gz);
           if (st) this.stamp(ch, st.blocks);
         }
+      }
+      // villages (after the trees, so they clear whatever grew in the way)
+      const wx0 = Math.floor((ch.x0 - 32) / VILLAGE_CELL), wx1 = Math.floor((ch.x0 + 15 + 32) / VILLAGE_CELL);
+      const wz0 = Math.floor((ch.z0 - 32) / VILLAGE_CELL), wz1 = Math.floor((ch.z0 + 15 + 32) / VILLAGE_CELL);
+      for (let gz = wz0; gz <= wz1; gz++) for (let gx = wx0; gx <= wx1; gx++) {
+        const v = this.village(gx, gz);
+        if (v && v.x + 32 >= ch.x0 && v.x - 32 <= ch.x0 + 15 && v.z + 32 >= ch.z0 && v.z - 32 <= ch.z0 + 15) this.stamp(ch, v.blocks);
+      }
+      // sealed vaults (deep underground, nothing grows over them)
+      const vx0 = Math.floor((ch.x0 - 10) / VAULT_CELL), vx1 = Math.floor((ch.x0 + 15 + 10) / VAULT_CELL);
+      const vz0 = Math.floor((ch.z0 - 10) / VAULT_CELL), vz1 = Math.floor((ch.z0 + 15 + 10) / VAULT_CELL);
+      for (let gz = vz0 - 1; gz <= vz1 + 1; gz++) for (let gx = vx0 - 1; gx <= vx1 + 1; gx++) {
+        const v = this.vault(gx, gz);
+        if (v.x + 9 >= ch.x0 && v.x - 9 <= ch.x0 + 15 && v.z + 9 >= ch.z0 && v.z - 9 <= ch.z0 + 15) this.stamp(ch, v.blocks);
       }
       // lava lakes go in last so they clear whatever grew over them
       const gx0 = Math.floor((ch.x0 - 8) / LAVA_CELL), gx1 = Math.floor((ch.x0 + 15 + 8) / LAVA_CELL);
@@ -455,6 +598,7 @@
       const h = Math.floor(c.h), forest = c.forest, river = c.river, hill = c.hill;
       if (h <= SEA + 2 || h > SEA + 30 || forest > 0.12 || river > 0) return -100;
       if (this.lavaNear(x, z, 16)) return -60;                 // never start beside a lava lake
+      if (this.villageNear(x, z, 46)) return -45;              // nor inside a village
       let maxd = 0;
       const probes = [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2], [-2, -2], [2, -2], [-2, 2]];
       for (const [dx, dz] of probes) maxd = Math.max(maxd, Math.abs(Math.floor(this.sample(x + dx, z + dz).h) - h));

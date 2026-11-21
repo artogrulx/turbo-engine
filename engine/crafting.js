@@ -12,7 +12,9 @@
 
   // ----------------------------------------------------------------- materials
   const MATERIALS = [['STICK', 210, 'Stick'], ['COAL', 211, 'Coal'], ['RAW_IRON', 212, 'Raw Iron'],
-    ['IRON_INGOT', 213, 'Iron Ingot'], ['DIAMOND', 214, 'Diamond'], ['FLINT', 215, 'Flint']];
+    ['IRON_INGOT', 213, 'Iron Ingot'], ['DIAMOND', 214, 'Diamond'], ['FLINT', 215, 'Flint'],
+    ['EMBER_ROD', 216, 'Ember Rod'], ['VOID_PEARL', 217, 'Void Pearl'],
+    ['EMBER_SCRAP', 220, 'Ember Scrap'], ['EMBER_INGOT', 221, 'Emberforged Ingot']];
   for (const [key, id, name] of MATERIALS) {
     I[key] = id;
     Items.defs[id] = { id, name, kind: 'material', max: 64, icon: null, material: key.toLowerCase() };
@@ -27,7 +29,8 @@
     { key: 'wood', name: 'Wooden', level: 1, speed: 2.0, dur: 48, color: [172, 134, 80] },
     { key: 'stone', name: 'Stone', level: 2, speed: 3.2, dur: 110, color: [132, 132, 138] },
     { key: 'iron', name: 'Iron', level: 3, speed: 4.5, dur: 240, color: [218, 220, 226] },
-    { key: 'diamond', name: 'Diamond', level: 4, speed: 6.5, dur: 1100, color: [86, 226, 230] }
+    { key: 'diamond', name: 'Diamond', level: 4, speed: 6.5, dur: 1100, color: [86, 226, 230] },
+    { key: 'ember', name: 'Emberforged', level: 5, speed: 9, dur: 2400, color: [255, 128, 52] }     // upgraded from diamond with ingots smelted from Ashlands ore
   ];
   const toolId = (tier, kind) => 300 + tier * 4 + kind;
   TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => {
@@ -35,12 +38,28 @@
     Items.defs[id] = { id, name: t.name + ' ' + KIND_NAME[k], kind: 'tool', tool: k, tier: t.level, tierIdx: ti, speed: t.speed, dur: t.dur, max: 1, icon: null };
   }));
 
+  // The seeker eye drifts toward the nearest vault, and seals the frames of its gate (see interaction.js).
+  I.SEEKER = 218;
+  Items.defs[218] = { id: 218, name: 'Seeker Eye', kind: 'seeker', material: 'seeker', max: 16, icon: null };
+  // The igniter lights an obsidian frame (see interaction.js); it wears out like a tool.
+  I.IGNITER = 219;
+  Items.defs[219] = { id: 219, name: 'Igniter', kind: 'igniter', tool: 'igniter', dur: 64, max: 1, icon: null };
+  // Melee damage by held item (hearts are 2 hp): swords hit hardest, other tools a bit less, bare hands 1.
+  const DAMAGE = { sword: [4, 5, 6, 7, 9], axe: [3, 4, 5, 6, 8], pickaxe: [2, 3, 4, 5, 6], shovel: [2, 3, 4, 5, 6] };
+  function weaponDamage(itemId) {
+    const it = itemId ? Items.get(itemId) : null;
+    return it && it.kind === 'tool' ? DAMAGE[it.tool][it.tierIdx] : 1;
+  }
+
   // Which tool a block prefers and which tier it needs before it drops anything.
   function setTool(ids, kind, level) { for (const id of ids) { BL.TOOL[id] = TOOL_CODE[kind]; BL.LEVEL[id] = level; } }
   setTool([B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.BRICKS, B.STONE_BRICKS, B.COAL_ORE, B.FURNACE], 'pickaxe', 1);
   setTool([B.IRON_ORE], 'pickaxe', 2);
   setTool([B.DIAMOND_ORE], 'pickaxe', 3);
-  setTool([B.OBSIDIAN], 'pickaxe', 4);                          // only a diamond pickaxe can harvest obsidian
+  setTool([B.OBSIDIAN], 'pickaxe', 4);
+  setTool([B.ASHSTONE, B.CINDERBRICK, B.VOIDSTONE], 'pickaxe', 1);
+  setTool([B.EMBERSTONE], 'pickaxe', 0);
+  setTool([B.ASH_ORE], 'pickaxe', 4);                           // ember ore (only in the Ashlands) wants a diamond pickaxe                          // only a diamond pickaxe can harvest obsidian
   setTool([B.OAK_LOG, B.BIRCH_LOG, B.SPRUCE_LOG, B.PLANKS, B.BIRCH_PLANKS, B.CRAFTING_TABLE], 'axe', 0);
   setTool([B.DIRT, B.GRASS, B.SAND, B.GRAVEL, B.CLAY, B.SNOW], 'shovel', 0);
 
@@ -48,6 +67,7 @@
   BL.defs[B.COAL_ORE].drop = I.COAL;
   BL.defs[B.IRON_ORE].drop = I.RAW_IRON;
   BL.defs[B.DIAMOND_ORE].drop = I.DIAMOND;
+  BL.defs[B.ASH_ORE].drop = I.EMBER_SCRAP;
   function dropFor(block, rand) {
     if (block === B.GRAVEL && (rand === undefined ? Math.random() : rand) < 0.25) return I.FLINT;
     return BL.defs[block].drop;
@@ -82,9 +102,14 @@
   shaped(['CCC', 'C C', 'CCC'], { C: G.cobble }, B.FURNACE, 1);
   shaped(['SS', 'SS'], { S: B.STONE }, B.STONE_BRICKS, 4);
   shaped(['I I', ' I '], { I: I.IRON_INGOT }, I.BUCKET, 1);
+  shapeless([I.FLINT, I.IRON_INGOT], I.IGNITER, 1);
+  shapeless([I.EMBER_ROD, I.VOID_PEARL], I.SEEKER, 1);
   const HEADS = [G.planks, G.cobble, I.IRON_INGOT, I.DIAMOND];
   const PATTERN = { pickaxe: ['MMM', ' S ', ' S '], axe: ['MM', 'MS', ' S'], shovel: ['M', 'S', 'S'], sword: ['M', 'M', 'S'] };
-  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => shaped(PATTERN[k], { M: HEADS[ti], S: I.STICK }, toolId(ti, ki), 1)));
+  TIERS.forEach((t, ti) => KINDS.forEach((k, ki) => {
+    if (HEADS[ti]) shaped(PATTERN[k], { M: HEADS[ti], S: I.STICK }, toolId(ti, ki), 1);
+    else shapeless([toolId(ti - 1, ki), I.EMBER_INGOT, I.EMBER_INGOT], toolId(ti, ki), 1);   // the top tier: a diamond tool and two emberforged ingots
+  }));
 
   function shapedMatches(r, cells, x0, y0, w, h, mirror) {
     for (let y = 0; y < h; y++) {
@@ -129,7 +154,7 @@
   }
 
   // ----------------------------------------------------------------- smelting
-  const SMELT = new Map([[I.RAW_IRON, I.IRON_INGOT], [B.COBBLE, B.STONE], [B.MOSSY_COBBLE, B.STONE], [B.SAND, B.GLASS], [B.CLAY, B.BRICKS]]);
+  const SMELT = new Map([[I.RAW_IRON, I.IRON_INGOT], [I.EMBER_SCRAP, I.EMBER_INGOT], [B.COBBLE, B.STONE], [B.MOSSY_COBBLE, B.STONE], [B.SAND, B.GLASS], [B.CLAY, B.BRICKS]]);
   const FUEL = new Map([[I.COAL, 80], [B.OAK_LOG, 15], [B.BIRCH_LOG, 15], [B.SPRUCE_LOG, 15], [B.PLANKS, 15], [B.BIRCH_PLANKS, 15], [B.CRAFTING_TABLE, 15], [I.STICK, 5]]);
   const SMELT_SECONDS = 8;
 
@@ -174,7 +199,8 @@
   /** Every furnace placed in the world, keyed by block position. */
   const Furnaces = {
     map: new Map(),
-    key(x, y, z) { return x + ',' + y + ',' + z; },
+    realm: 'meadow',                // furnaces in the other realms are keyed apart (same coordinates, different world)
+    key(x, y, z) { return (this.realm === 'meadow' ? '' : this.realm + ':') + x + ',' + y + ',' + z; },
     at(x, y, z) { const k = this.key(x, y, z); let f = this.map.get(k); if (!f) this.map.set(k, (f = new Furnace())); return f; },
     /** Removes a furnace and returns what was inside it. */
     take(x, y, z) { const k = this.key(x, y, z), f = this.map.get(k); this.map.delete(k); return f ? f.slots.filter(Boolean) : []; },
@@ -187,6 +213,6 @@
     }
   };
 
-  OM.Crafting = { recipes, find, mining, dropFor, TIERS, KINDS, toolId, GROUP: G, SMELT, FUEL, SMELT_SECONDS, Furnace };
+  OM.Crafting = { recipes, find, mining, dropFor, weaponDamage, TIERS, KINDS, toolId, GROUP: G, SMELT, FUEL, SMELT_SECONDS, Furnace };
   OM.Furnaces = Furnaces;
 })();

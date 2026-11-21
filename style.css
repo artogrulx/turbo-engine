@@ -41,6 +41,11 @@ body.in-game #game-canvas { cursor: none; }
     radial-gradient(ellipse at 50% 35%, rgba(70, 170, 190, 0.05) 0%, rgba(10, 70, 90, 0.35) 70%, rgba(4, 30, 44, 0.75) 100%),
     linear-gradient(180deg, rgba(120, 210, 230, 0.12), rgba(10, 50, 70, 0.25));
 }
+#portal-overlay {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 4; display: grid; place-items: center;
+  background: radial-gradient(ellipse at center, rgba(150, 70, 230, 0.45) 0%, rgba(70, 20, 130, 0.88) 70%, rgba(20, 4, 44, 0.97) 100%);
+  font-size: 22px; font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
 #lava-overlay {
   position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 2;
   background: radial-gradient(ellipse at 50% 40%, rgba(255, 170, 40, 0.75) 0%, rgba(230, 70, 10, 0.9) 60%, rgba(120, 20, 0, 0.97) 100%);
@@ -118,6 +123,15 @@ body.in-game #game-canvas { cursor: none; }
   font: 12px/1.5 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
   background: rgba(0, 0, 0, 0.5); border-radius: 8px; white-space: pre;
 }
+
+#boss-bar { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(420px, 80vw); text-align: center; font-size: 14px; font-weight: 800; letter-spacing: 0.05em; text-shadow: 1px 1px 0 #000; }
+.boss-track { height: 12px; margin-top: 5px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); overflow: hidden; }
+.boss-track i { display: block; height: 100%; width: 100%; background: linear-gradient(180deg, #d9a2ff, #7a3fd0); transition: width 0.15s; }
+#ending-screen { background: radial-gradient(ellipse at center, rgba(40, 18, 80, 0.55), rgba(8, 4, 24, 0.92)); z-index: 22; }
+.ending-panel { width: min(560px, 100%); text-align: center; }
+#mob-bar { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: min(260px, 60vw); text-align: center; font-size: 13px; font-weight: 700; text-shadow: 1px 1px 0 #000; }
+.mob-track { height: 8px; margin-top: 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.25); overflow: hidden; }
+.mob-track i { display: block; height: 100%; width: 100%; background: linear-gradient(180deg, #ff7a6e, #d8362a); transition: width 0.12s; }
 
 /* ---------------------------------------------------------------- slots */
 .slot {
